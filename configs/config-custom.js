@@ -34,6 +34,7 @@ let map = {
         "MODE": "ffa",
         //"serverName": "Free For All",
 		"displayName": "", // Replaces the gamemode name on the website (25 Character limit)
+		"displayDesc": "", // Replaces the gamemode description on the website (350 character limit)
         "TEAM_AMOUNT": 2,
         "RANDOM_COLORS": false,
         "BOSS_SPAWN_TIMER": 2000, // Infinity disables bosses

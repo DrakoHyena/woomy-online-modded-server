@@ -13,21 +13,27 @@ import * as wsLib from "ws"
 // PEER
 //
 const iceServers = [
-	'stun:stun.l.google.com:19302',
-	'stun:stun1.l.google.com:19302',
-	'stun:stun2.l.google.com:19302',
-	'stun:stun3.l.google.com:19302',
-	'stun:stun4.l.google.com:19302',
+  { hostname: 'stun.l.google.com', port: 19302 },
+  { hostname: 'stun1.l.google.com', port: 19302 },
+  { hostname: 'stun2.l.google.com', port: 19302 },
+  { hostname: 'stun3.l.google.com', port: 19302 },
+  { hostname: 'stun4.l.google.com', port: 19302 }
 ];
 iceServers.fetchTurnCredentials = async function() {
   try {
     const response = await fetch('https://woomy.online/api/get-turn-credentials');
     if (!response.ok) {
-      throw new Error(`Failed to fetch TURN credentials: ${response.statusText}`);
+      console.error(`Failed to fetch TURN credentials: ${response.statusText}`);
     }
     const turnConfig = await response.json();
     console.log("Successfully fetched TURN credentials.");
-    return [`turn:${turnConfig.username}:${turnConfig.password}@74.208.44.199:3478`];
+    return [{
+		hostname: "74.208.44.199",
+		port: 3478,
+		username: turnConfig.username,
+		password: turnConfig.password,
+		relayType: "TurnUdp"
+	}];
   } catch (error) {
     console.error("Could not get TURN credentials, continuing without them.", error);
     return []; // Return null so the connection can proceed without TURN
@@ -36,9 +42,9 @@ iceServers.fetchTurnCredentials = async function() {
 class PeerWrapper {
 	constructor(iceServersParam) {
 		const servers = iceServers.concat(iceServersParam)
-		this.peer = new NodePeer(Date.now().toString(), {config:{
+		this.peer = new NodePeer(Date.now().toString(), {
 			iceServers: servers
-		}});
+		});
 		this.conn = null;
 		this.id = null;
 		this.onmessage = undefined;
@@ -117,8 +123,8 @@ class PeerWrapper {
 	}
 
 	destroy() {
-		//this.conn?.close();
-		//this.peer.destroy();
+		this.conn?.close();
+		this.peer.destroy();
 		console.log(`[Peer ${this.id}] Destroyed`);
 	}
 }
@@ -183,7 +189,7 @@ async function wrmHost() {
 		console.log("Room socket closed with room manager. Retrying in 5 seconds.")
 		setTimeout(async ()=>{
 			console.log("Retrying WRM connection...")
-			await wrmHost();
+			await wrmHost().catch((e)=>console.error("Failed to restart", e));
 			hostRoomId = await getHostRoomId();
 		}, 5000)
 	}
@@ -235,7 +241,8 @@ worker.start = async function (gamemodeCode, gamemodeName) {
 					// WRM, RoomUpdatePlayers
 					roomWs.send(JSON.stringify({
 						players: data.players,
-						gamemodeCode:  data.gamemode||gamemodeCode
+						name:  data.name||gamemodeCode,
+						desc: data.desc
 					}))
 					break;
 				case "serverStartText":

@@ -15,15 +15,11 @@
  */
 
 import { EventEmitter } from 'events';
-import { PeerConnection } from 'node-datachannel';
+import { PeerConnection, RtcpReceivingSession } from 'node-datachannel';
 import { WebSocket } from 'ws';
 import { randomBytes } from 'crypto';
 
 const log = (message) => console.log(`[${new Date().toISOString()}] ${message}`);
-
-// PeerJS binary protocol constants
-const MAGIC_BYTE = 0xDA;
-const FLAGS_BYTE = 0x00;
 
 class NodeDataConnection extends EventEmitter {
   constructor(peer, provider, options = {}) {
@@ -46,7 +42,6 @@ class NodeDataConnection extends EventEmitter {
   }
 
   _start() {
-	console.log(this.provider.options)
     this._pc = new PeerConnection(this.peer, this.provider.options);
     this._setupPeerConnectionListeners();
     
@@ -131,16 +126,8 @@ class NodeDataConnection extends EventEmitter {
 
     // Handle incoming messages - strip PeerJS binary protocol header
     dc.onMessage(msg => {
-      if (!Buffer.isBuffer(msg)) return;
-      
-      // Check for PeerJS binary protocol: [MAGIC_BYTE, FLAGS, LENGTH, ...PAYLOAD]
-      if (msg.length > 3 && msg[0] === MAGIC_BYTE && msg[1] === FLAGS_BYTE) {
-        const payload = msg.slice(3);
-        this.emit('data', payload);
-      } else {
         // Pass through raw buffer if not in expected format
         this.emit('data', msg);
-      }
     });
 
     dc.onClosed(() => {
@@ -186,7 +173,7 @@ export class NodePeer extends EventEmitter {
       port: 443,
       path: '/peerjs',
       secure: true,
-      iceServers: []
+      iceServers: [],
     };
     
     // Merge and transform ICE servers
