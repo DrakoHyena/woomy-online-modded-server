@@ -1,0 +1,16 @@
+{
+    "MODE": "tdm",
+    "TEAM_AMOUNT": 2,
+    "BOTS": 0,
+    "serverName": "oh fuck",
+    "ARENA_TYPE": 1,
+    "ROOM_SETUP": [
+        ["rock", "rock", "rock"],
+        ["rock", "nest", "rock"],
+        ["rock", "rock", "rock"]
+    ],
+    "X_GRID": 3,
+    "Y_GRID": 3,
+    "WIDTH": 3500,
+    "HEIGHT": 3500
+}

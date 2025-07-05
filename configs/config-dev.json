@@ -1,0 +1,12 @@
+{
+    "maxPlayers": 20,
+    "BETA": 1,
+    "WIDTH": 7500,
+    "HEIGHT": 7500,
+    "serverName": "Developer Server",
+    "RANDOM_COLORS": false,
+    "BOTS": 15,
+    "IS_DEV_SERVER": true,
+    "tabLimit": 1000,
+    "NEW_COLLISIONS": false
+}

@@ -1,0 +1,41 @@
+{
+    "MODE": "tdm",
+    "serverName": "4 TDM Tag",
+    "TEAM_AMOUNT": 4,
+    "SPAWN_DOMINATORS": true,
+    "PORTALS": {
+        "ENABLED": true,
+        "THRESHOLD": 500,
+        "LAUNCH_FORCE": 500,
+        "GRAVITY": 20000,
+        "DIVIDER_1": {
+            "ENABLED": true,
+            "LEFT": 3666.6666666666665,
+            "RIGHT": 4333.333333333333
+        },
+        "DIVIDER_2": {
+            "ENABLED": false,
+            "TOP": 3666.6666666666665,
+            "BOTTOM": 4333.333333333333
+        }
+    },
+    "WIDTH": 8000,
+    "HEIGHT": 3666.6666666666665,
+    "ROOM_SETUP": [
+        ["roid", "roid", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "roid", "roid", "edge", "edge", "norm", "norm", "norm", "norm", "roid", "roid", "roid", "norm", "norm", "norm", "norm"],
+        ["roid", "norm", "norm", "norm", "norm", "por1", "norm", "norm", "norm", "norm", "roid", "edge", "edge", "norm", "por1", "norm", "norm", "norm", "roid", "norm", "norm", "norm", "por2", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "roid", "nest", "nest", "nest", "roid", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "roid", "nest", "nest", "nest", "roid", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "nest", "norm", "norm", "norm", "nest", "norm", "norm", "norm", "edge", "edge", "roid", "norm", "norm", "nest", "norm", "norm", "norm", "nest", "norm", "norm", "roid"],
+        ["norm", "por4", "norm", "nest", "norm", "domi", "norm", "nest", "norm", "por3", "norm", "edge", "edge", "roid", "roid", "norm", "nest", "norm", "domi", "norm", "nest", "norm", "roid", "roid"],
+        ["norm", "norm", "norm", "nest", "norm", "norm", "norm", "nest", "norm", "norm", "norm", "edge", "edge", "roid", "norm", "norm", "nest", "norm", "norm", "norm", "nest", "norm", "norm", "roid"],
+        ["norm", "norm", "norm", "roid", "nest", "nest", "nest", "roid", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "roid", "nest", "nest", "nest", "roid", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["roid", "norm", "norm", "norm", "norm", "por2", "norm", "norm", "norm", "norm", "roid", "edge", "edge", "norm", "por3", "norm", "norm", "norm", "roid", "norm", "norm", "norm", "por4", "norm"],
+        ["roid", "roid", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "roid", "roid", "edge", "edge", "norm", "norm", "norm", "norm", "roid", "roid", "roid", "norm", "norm", "norm", "norm"]
+    ],
+    "X_GRID": 24,
+    "Y_GRID": 11,
+    "BOTS": 25,
+    "FOOD_AMOUNT": 0.2
+}

@@ -1,0 +1,51 @@
+{
+    "MODE": "ffa",
+    "serverName": "Portal FFA",
+    "PORTALS": {
+        "ENABLED": true,
+        "THRESHOLD": 500,
+        "LAUNCH_FORCE": 500,
+        "GRAVITY": 20000,
+        "DIVIDER_1": {
+            "ENABLED": true,
+            "LEFT": 3666.6666666666665,
+            "RIGHT": 4333.333333333333
+        },
+        "DIVIDER_2": {
+            "ENABLED": true,
+            "TOP": 3666.6666666666665,
+            "BOTTOM": 4333.333333333333
+        }
+    },
+    "WIDTH": 8000,
+    "HEIGHT": 8000,
+    "ROOM_SETUP": [
+        ["rock", "norm", "norm", "norm", "rock", "rock", "rock", "norm", "norm", "roid", "norm", "edge", "edge", "roid", "norm", "norm", "norm", "rock", "rock", "rock", "norm", "norm", "norm", "rock"],
+        ["norm", "roid", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "roid", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["rock", "norm", "norm", "norm", "nest", "nest", "nest", "norm", "norm", "rock", "norm", "edge", "edge", "rock", "norm", "norm", "norm", "nest", "nest", "nest", "norm", "norm", "norm", "rock"],
+        ["rock", "norm", "norm", "norm", "nest", "port", "nest", "norm", "norm", "rock", "norm", "edge", "edge", "rock", "norm", "norm", "norm", "nest", "port", "nest", "norm", "norm", "norm", "rock"],
+        ["rock", "norm", "norm", "norm", "nest", "nest", "nest", "norm", "norm", "rock", "norm", "edge", "edge", "rock", "norm", "norm", "norm", "nest", "nest", "nest", "norm", "norm", "norm", "rock"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["roid", "norm", "norm", "norm", "rock", "rock", "rock", "norm", "norm", "roid", "norm", "edge", "edge", "roid", "norm", "norm", "norm", "rock", "rock", "rock", "norm", "norm", "norm", "roid"],
+        ["edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge"],
+        ["edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge", "edge"],
+        ["roid", "norm", "norm", "norm", "rock", "rock", "rock", "norm", "norm", "roid", "norm", "edge", "edge", "roid", "norm", "norm", "norm", "rock", "rock", "rock", "norm", "norm", "norm", "roid"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["rock", "norm", "norm", "norm", "nest", "nest", "nest", "norm", "norm", "rock", "norm", "edge", "edge", "rock", "norm", "norm", "norm", "nest", "nest", "nest", "norm", "norm", "norm", "rock"],
+        ["rock", "norm", "norm", "norm", "nest", "port", "nest", "norm", "norm", "rock", "norm", "edge", "edge", "rock", "norm", "norm", "norm", "nest", "port", "nest", "norm", "norm", "norm", "rock"],
+        ["rock", "norm", "norm", "norm", "nest", "nest", "nest", "norm", "norm", "rock", "norm", "edge", "edge", "rock", "norm", "norm", "norm", "nest", "nest", "nest", "norm", "norm", "norm", "rock"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "roid", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "edge", "edge", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "roid", "norm"],
+        ["rock", "norm", "norm", "norm", "rock", "rock", "rock", "norm", "norm", "roid", "norm", "edge", "edge", "roid", "norm", "norm", "norm", "rock", "rock", "rock", "norm", "norm", "norm", "rock"]
+    ],
+    "X_GRID": 24,
+    "Y_GRID": 24,
+    "BOTS": 25
+}

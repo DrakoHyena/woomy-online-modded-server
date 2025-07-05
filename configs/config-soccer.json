@@ -1,0 +1,24 @@
+{
+    "MODE": "tdm",
+    "serverName": "Soccer",
+    "connectionLimit": 100,
+    "TEAM_AMOUNT": 2,
+    "WIDTH": 5000,
+    "HEIGHT": 3750,
+    "X_GRID": 12,
+    "Y_GRID": 9,
+    "ROOM_SETUP": [
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["n_b1", "norm", "norm", "norm", "norm", "nest", "nest", "norm", "norm", "norm", "norm", "n_b2"],
+        ["n_b1", "norm", "norm", "norm", "norm", "nest", "nest", "norm", "norm", "norm", "norm", "n_b2"],
+        ["n_b1", "norm", "norm", "norm", "norm", "nest", "nest", "norm", "norm", "norm", "norm", "n_b2"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"]
+    ],
+    "BOTS": 0,
+    "FOOD_AMOUNT": 0.1,
+    "SOCCER": true
+}

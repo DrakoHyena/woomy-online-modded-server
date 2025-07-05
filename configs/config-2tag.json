@@ -1,0 +1,22 @@
+{
+    "MODE": "tdm",
+    "serverName": "2 TDM Tag",
+    "TEAM_AMOUNT": 2,
+    "SPAWN_DOMINATORS": true,
+    "ROOM_SETUP": [
+        ["roid", "norm", "norm", "norm", "roid", "norm", "norm", "norm", "roid"],
+        ["norm", "nest", "nest", "roid", "roid", "roid", "nest", "nest", "norm"],
+        ["norm", "nest", "roid", "norm", "roid", "norm", "roid", "nest", "norm"],
+        ["norm", "roid", "norm", "norm", "norm", "norm", "norm", "roid", "norm"],
+        ["roid", "roid", "roid", "norm", "domi", "norm", "roid", "roid", "roid"],
+        ["norm", "roid", "norm", "norm", "norm", "norm", "norm", "roid", "norm"],
+        ["norm", "nest", "roid", "norm", "roid", "norm", "roid", "nest", "norm"],
+        ["norm", "nest", "nest", "roid", "roid", "roid", "nest", "nest", "norm"],
+        ["roid", "norm", "norm", "norm", "roid", "norm", "norm", "norm", "roid"]
+    ],
+    "X_GRID": 9,
+    "Y_GRID": 9,
+    "WIDTH": 3750,
+    "HEIGHT": 3750,
+    "BOTS": 25
+}

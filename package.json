@@ -1,0 +1,18 @@
+{
+  "name": "woomy-online-revitalized",
+  "version": "1.0.0",
+  "main": "webserver.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node ./start.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "node-datachannel": "^0.28.0",
+    "peerjs": "^1.5.5",
+    "ws": "^8.18.2"
+  }
+}

@@ -1,0 +1,55 @@
+{
+    "maxPlayers": 60,
+    "BETA": 1,
+    "serverName": "Growth Growth Growth",
+    "testingMode": false,
+    "MODE": "tdm",
+    "TEAM_AMOUNT": 2,
+    "SPAWN_DOMINATORS": true,
+    "BOTS": 25,
+    "WIDTH": 5400,
+    "HEIGHT": 5400,
+    "BOSS_SPAWN_TIMER": 500,
+    "ROOM_SETUP": [
+        ["por1", "n_b1", "n_b1", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "n_b2", "n_b2", "por2"],
+        ["n_b1", "bad1", "n_b1", "norm", "norm", "norm", "norm", "norm", "norm", "roid", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "n_b2", "bad2", "n_b2"],
+        ["n_b1", "n_b1", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "n_b2", "n_b2"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "roid", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "roid", "norm", "norm", "rock", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "nest", "nest", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "nest", "nest", "nest", "nest", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "rock", "norm", "norm", "nest", "nest", "nest", "nest", "nest", "nest", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "nest", "nest", "nest", "rock", "rock", "nest", "nest", "nest", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "rock", "norm", "norm", "nest", "nest", "nest", "rock", "rock", "nest", "nest", "nest", "norm", "norm", "norm", "norm", "roid", "norm"],
+        ["rock", "norm", "norm", "norm", "norm", "norm", "norm", "nest", "nest", "nest", "nest", "nest", "nest", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "nest", "nest", "nest", "nest", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "nest", "nest", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "roid", "norm", "rock", "norm", "norm", "norm", "norm", "norm", "roid", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm"],
+        ["n_b2", "n_b2", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "rock", "norm", "roid", "norm", "norm", "norm", "norm", "norm", "norm", "n_b1", "n_b1"],
+        ["n_b2", "bad2", "n_b2", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "n_b1", "bad1", "n_b1"],
+        ["por2", "n_b2", "n_b2", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "n_b1", "n_b1", "por1"]
+    ],
+    "X_GRID": 20,
+    "Y_GRID": 20,
+    "PORTALS": {
+        "ENABLED": true,
+        "THRESHOLD": 500,
+        "LAUNCH_FORCE": 500,
+        "GRAVITY": 20000,
+        "DIVIDER_1": {
+            "ENABLED": false,
+            "LEFT": 4860,
+            "RIGHT": 5940
+        },
+        "DIVIDER_2": {
+            "ENABLED": false,
+            "LEFT": 4860,
+            "RIGHT": 5940
+        }
+    },
+    "SKILL_CAP": 1500,
+    "KILL_SCORE_FORMULA": "Math.min(x, 2_500_000) * 7 / 8"
+}

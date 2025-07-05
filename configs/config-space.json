@@ -1,0 +1,28 @@
+{
+    "MODE": "ffa",
+    "serverName": "Space FFA",
+    "ARENA_TYPE": 1,
+    "ROOM_SETUP": [
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "rock", "norm", "norm", "norm", "norm", "roid", "norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "rock", "norm", "norm", "rock", "norm", "roid", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "roid", "norm", "roid", "norm", "norm", "nest", "nest", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "nest", "nest", "nest", "nest", "norm", "norm", "norm", "rock", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "rock", "norm", "nest", "nest", "nest", "nest", "nest", "nest", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "nest", "nest", "nest", "nest", "nest", "nest", "nest", "nest", "norm", "norm", "roid", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "nest", "nest", "nest", "nest", "nest", "nest", "nest", "nest", "rock", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "roid", "norm", "norm", "nest", "nest", "nest", "nest", "nest", "nest", "norm", "norm", "rock", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "nest", "nest", "nest", "nest", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "rock", "norm", "roid", "norm", "nest", "nest", "norm", "norm", "roid", "norm", "roid", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "rock", "norm", "norm", "norm", "rock", "norm", "norm", "roid", "norm", "rock", "norm", "rock", "roid", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"],
+        ["norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm", "norm"]
+    ],
+    "X_GRID": 18,
+    "Y_GRID": 18,
+    "BOTS": 16
+}

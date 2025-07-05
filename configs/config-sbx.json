@@ -1,0 +1,19 @@
+{
+    "MODE": "ffa",
+    "serverName": "Sandbox",
+    "maxPlayers": 50,
+    "SANDBOX": true,
+    "tabLimit": 2,
+    "ROOM_SETUP": [
+        ["norm", "norm", "norm"],
+        ["norm", "nest", "norm"],
+        ["norm", "norm", "norm"]
+    ],
+    "X_GRID": 3,
+    "Y_GRID": 3,
+    "WIDTH": 3000,
+    "HEIGHT": 3000,
+    "MAX_FOOD": 125,
+    "MAX_NEST_FOOD": 15,
+    "MAX_CRASHERS": 3
+}
