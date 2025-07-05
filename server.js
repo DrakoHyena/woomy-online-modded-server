@@ -2026,6 +2026,7 @@ const Chain = Chainf;
 
             // Helper function to round values and remove near-zero values
             function rounder(val) {
+				if ((typeof val) == "string") {return val}
                 return Math.abs(val) < 0.001 ? 0 : +val.toPrecision(12);
             }
 
