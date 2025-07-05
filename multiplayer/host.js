@@ -42,7 +42,7 @@ iceServers.fetchTurnCredentials = async function() {
 class PeerWrapper {
 	constructor(iceServersParam) {
 		const servers = iceServers.concat(iceServersParam)
-		this.peer = new NodePeer(Date.now().toString(), {
+		this.peer = new NodePeer(crypto.randomUUID(), {
 			iceServers: servers
 		});
 		this.conn = null;
