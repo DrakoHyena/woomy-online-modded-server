@@ -1,15 +1,15 @@
-// COMPAT //
-import { parentPort } from "worker_threads"
 import * as fs from "node:fs"
+import { parentPort } from "worker_threads"
 
-const worker = parentPort
-let workerWindow = worker
+// COMPAT //
+const worker = typeof parentPort==="undefined"?self:parentPort
+if(typeof global === "undefined") global = worker
+if(typeof fs === "undefined") fs = undefined;
 
 global.utility = {
     log: (e) => { console.log("[LOG]", e) }
 }
-
-workerWindow.process = {
+global.process = {
     env: {},
     argv: []
 };
@@ -20,15 +20,16 @@ const SERVER_PROTOCOL_VERSION = 1;
 const userSockets = new Map()
 const bannedPlayers = [];
 
-worker.on("message", function (msg) {
-    const data = msg
+worker.onmessage = function (msg) {
+    const data = msg.data
+
     switch (data.type) {
         case "startServer":
             import("./definitions.js").then((res) => {
                 worker.postMessage({ type: "serverStartText", text: "Loading definitions..." })
                 global.initExportCode = res.initExportCode
                 console.log(data.server)
-                startServer(data.server.suffix, data.server.gamemode, res.defExports)
+                startServer(data.server.suffix, res.defExports, data.server.displayName, data.server.displayDesc)
             }).catch((err) => {
                 console.error(err)
                 worker.postMessage({ type: "serverStartText", text: "Error loading definitons", tip: "Please reload the page and try again" })
@@ -38,16 +39,21 @@ worker.on("message", function (msg) {
             userSockets.get(data.data[0]).onmessage(data.data[1])
             break;
         case "playerJoin":
-            workerWindow.sockets.connect(data.playerId)
+            global.sockets.connect(data.playerId)
             break;
         case "playerDc":
             userSockets.get(data.playerId).close()
             userSockets.delete(data.playerId)
             break;
+		case "roomId":
+			for(let [k,v] of userSockets){
+				v.talk("nrid", data.id)
+			}
+			break;
     }
-})
+}
 
-function userSocket(playerId) {
+function userSocket(playerId, encode) {
     return {
         on: (type, funct) => {
             if (type === "message") {
@@ -55,16 +61,54 @@ function userSocket(playerId) {
             }
         },
         send: (e) => {
-            worker.postMessage({ type: "clientMessage", playerId: playerId, data: e })
+            worker.postMessage({ type: "clientMessage", playerId: playerId, data: encode(e) })
         }
     }
 };
 
 // MORE COMPAT //
+// Ultra-fast atan2 implementation - replaces Math.atan2 prototype
+const PI = 3.141592653589793;
+const PI_2 = 1.5707963267948966;
+
+function ultraFastAtan2(y, x) {
+    // Fast NaN protection
+    if (y !== y || x !== x) return null;
+    if (x === 0) return y > 0 ? PI_2 : y < 0 ? -PI_2 : 0;
+    
+    const absY = y < 0 ? -y : y;
+    const absX = x < 0 ? -x : x;
+    
+    let angle;
+    if (absY <= absX) {
+        const t = absY / absX;
+        angle = t / (1 + 0.28125 * t * t);
+    } else {
+        const t = absX / absY;
+        angle = PI_2 - t / (1 + 0.28125 * t * t);
+    }
+    
+    if (x < 0) {
+        angle = y >= 0 ? PI - angle : angle - PI;
+    } else if (y < 0) {
+        angle = -angle;
+    }
+    
+    return angle;
+}
+
+// Override Math.atan2 prototype
+Object.defineProperty(Math, 'atan2', {
+    value: ultraFastAtan2,
+    writable: true,
+    enumerable: false,
+    configurable: true
+});
+
 function oddify(number, multiplier = 1) {
     return number + ((number % 2) * multiplier);
 }
-workerWindow.mapConfig = {
+global.mapConfig = {
     getBaseShuffling: function (teams, max = 5) {
         const output = [];
         for (let i = 1; i < max; i++) {
@@ -125,7 +169,7 @@ workerWindow.mapConfig = {
     }
 }
 
-workerWindow.require = function (thing) {
+global.require = function (thing) {
     switch (thing) {
         case "../../lib/util.js":
         case "./util.js":
@@ -881,7 +925,7 @@ workerWindow.require = function (thing) {
 
 // THE SERVER //
 
-async function startServer(configSuffix, serverGamemode, defExports) {
+async function startServer(configSuffix, defExports, displyNameOverride, displayDescOverride) {
     //configSuffix = "blackout4tdm.json" 
     /*jslint node: true */
     /*jshint -W061 */
@@ -1056,7 +1100,8 @@ async function startServer(configSuffix, serverGamemode, defExports) {
     let tokendata = {};
 
     const webhooks = (function () {
-        let privateQueue = {
+        const https = require("https");
+        let private_ = {
             keys: {
                 // USA
                 "a": "/api/webhooks/1018582651147403284/pPuQBkSl7hSF5M3L9mBefvQf7ahDyi85kz2KGIuQm8FhS3FrjxYk9kuqLrCuheDL7Elk",
@@ -1085,23 +1130,60 @@ async function startServer(configSuffix, serverGamemode, defExports) {
             queue: [],
             lastSend: 0,
             send(data) {
-
+                let path = private_.keys[process.env.HASH || "z"] || private_.keys.default;
+                let req = https.request({
+                    hostname: 'discordapp.com',
+                    path,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }, () => { });
+                req.write(JSON.stringify({
+                    content: data.trim()
+                }));
+                req.end();
             },
             publish(force) {
-
+                let output = "";
+                if (private_.queue.length < 3 && Date.now() - private_.lastSend < 10000 && !force) {
+                    return;
+                }
+                private_.lastSend = Date.now();
+                while (private_.queue.length > 0) {
+                    if (output + "\n" + private_.queue[0] > 2000) {
+                        private_.send(output);
+                        return;
+                    }
+                    output += "\n" + private_.queue.shift();
+                }
+                private_.send(output);
             },
             log(data, force) {
-
+                data = data + "";
+                data = data.replace("@", "🤓");
+                data = data.trim();
+                if (data.length > 2000) {
+                    while (data.length) {
+                        private_.send(data.slice(0, 2000).trim());
+                        data = data.slice(2000).trim();
+                    }
+                    return;
+                }
+                private_.queue.push(data);
+                if (force) {
+                    private_.publish(true);
+                }
             }
         };
-        //setInterval(privateQueue.publish, 5000);
+        //setInterval(private_.publish, 5000);
         return {
             log: (data, force) => {
-                //privateQueue.log('[' + util.getLogTime() + ']: ' + data, force);
+                //private_.log('[' + util.getLogTime() + ']: ' + data, force);
             }
         }
     })();
-    const util = workerWindow.require("./lib/util");
+    const util = require("./lib/util");
     /**
  * Expert-level, high-performance collection optimized for ultra-hot paths.
  *
@@ -1428,7 +1510,7 @@ const Chain = Chainf;
             "SKILL_CHEAT_CAP": 60,
             "SKILL_LEAK": 0,
             "STEALTH": 4,
-            "MIN_SPEED": 0.000001,
+            "MIN_SPEED": Number.MIN_VALUE,
             "MIN_DAMAGE": 0,
             "MAX_FOOD": 400,
             "MAX_NEST_FOOD": 30,
@@ -1463,14 +1545,20 @@ const Chain = Chainf;
         }
 
         let gamemodeConfig = {};
-        let res = fs.readFileSync("./configs/config-" + configSuffix)
-        if (configSuffix.includes(".json")) {
-            gamemodeConfig = JSON.parse(res)
-        } else if (configSuffix.includes(".js")) {
-            gamemodeConfig = eval(res)
-        } else {
-            console.error("Invalid gamemode file type " + configSuffix)
-        }
+		const configUrl = "./configs/config-" + configSuffix
+        let res = undefined;
+		if(!fs){
+			res = await fetch(configUrl)
+        	if (configSuffix.includes(".json")) {
+        	    gamemodeConfig = await res.json()
+       		} else if (configSuffix.includes(".js")) {
+        	    gamemodeConfig = eval(await res.text())
+        	} else {
+        	    console.error("Invalid gamemode file type " + configSuffix)
+        	}
+		}else{
+			res = fs.readFileSync(configUrl)
+		}
         if (gamemodeConfig.selectable === false) {
             worker.postMessage({ type: "serverStartText", text: "This gamemode is not selectable", tip: "Only modded versions of the game can start a Modded server. Please select a different mode." })
             return;
@@ -1601,7 +1689,7 @@ const Chain = Chainf;
             global.gamemodeCode = { generateNewTank: getCrptFunction() }
         }
         webhooks.log("Server initializing!");
-        const ran = workerWindow.require("./lib/random");
+        const ran = require("./lib/random");
         global.sandboxRooms = [];
         Array.prototype.remove = index => {
             if (index === this.length - 1) return this.pop();
@@ -1635,6 +1723,7 @@ const Chain = Chainf;
                 this.ygridHeight = this.height / this.ygrid;
                 this.lastCycle = undefined;
                 this.cycleSpeed = 1000 / c.gameSpeed / 30;
+				this.lagComp = 1;
                 this.gameMode = config.MODE;
                 this.testingMode = c.testingMode;
                 this.speed = c.gameSpeed;
@@ -1646,8 +1735,8 @@ const Chain = Chainf;
                 this.maxSancs = config.MAX_SANCS;
                 this.skillBoost = config.SKILL_BOOST;
                 this.topPlayerID = -1;
-				this.displayName = config.displayName;
-				this.displayDesc = config.displayDesc;
+				this.displayName = displyNameOverride||config.displayName||"";
+				this.displayDesc = displayDescOverride||config.displayDesc||"";
                 this.arenaClosed = false;
                 this.teamAmount = c.TEAM_AMOUNT;
                 this.modelMode = c.modelMode;
@@ -4214,7 +4303,9 @@ const Chain = Chainf;
 				};
 
 				let bestTarget = null;
-				let maxDanger = -Infinity;
+				// Renamed maxDanger to maxValue to reflect the new combined metric.
+				let maxValue = -Infinity; 
+				let maxDist = -Infinity
 				let foundLockedTarget = false;
 
 				// HOT PATH: This callback runs for every potential target.
@@ -4225,12 +4316,11 @@ const Chain = Chainf;
 					if (entity.master.master.team === myTeam || entity.team === -101) return;
 					if (entity.isDead() || entity.passive || entity.invuln) return;
 					if (!FARMER && entity.dangerValue < 0) return;
-					if (entity.dangerValue < maxDanger) return;
 					if (entity.alpha < 0.5 && !canSeeInvis) return;
 					if (c.SANDBOX && entity.sandboxId !== body.sandboxId) return;
 
 					switch (entity.type) {
-						case 'tank': case 'miniboss': case 'crasher': break;
+						case "drone": case "minion": case 'tank': case 'miniboss': case 'crasher': break;
 						case 'food': if (IGNORE_SHAPES) return; break;
 						default: return;
 					}
@@ -4247,10 +4337,25 @@ const Chain = Chainf;
 						if ((dot / angleToTargetMag) < this.firingArcCos) return;
 					}
 
-					if(maxDanger < entity.dangerValue || (maxDanger === entity.dangerValue && Math.random()>.5)){
+					// Calculate distance between the current body and the potential target entity.
+					const dx = entity.x - body.x;
+					const dy = entity.y - body.y;
+					const distance = Math.sqrt(dx * dx + dy * dy);
+
+					// Calculate the effective value, incorporating distance as 1/3 as valuable as danger.
+					// This means distance applies a buff: (distance / 3) increases the dangerValue.
+					const effectiveValue = (entity.dangerValue||1) * distance;
+
+					// If the current target's effective value is less than the best found so far, skip it.
+					if (effectiveValue < maxValue) return;
+
+					// Update the best target if the current one has a higher effective value,
+					if(maxValue <= effectiveValue && maxDist < distance){
 						bestTarget = entity;
-						maxDanger = entity.dangerValue;
+						maxValue = effectiveValue;
+						maxDist = distance
 					}
+
 					if (this.targetLock === entity) {
 						foundLockedTarget = true;
 					}
@@ -4278,10 +4383,15 @@ const Chain = Chainf;
 				}
 
 				// Throttle expensive target acquisition.
-				if (++this.tick > 15) {
+				if (++this.tick > room.cycleSpeed) {
 					this.tick = 0;
-					const range = this.body.aiSettings.SKYNET ? this.body.fov : this.body.master.fov;
-					this.findTarget(range);
+					let range = this.body.aiSettings.SKYNET ? this.body.fov : this.body.master.fov;
+					range *= this.body.aiSettings.BLIND ? 2/3 : 1
+					// The old calculation used a circle range so we approximate a square with similar coverage
+					// We nerf range slightly because players complain
+					this.findTarget(
+						(range-(range/Math.sqrt(2))/2) * .7
+					);
 				}
 
 				// Idle if no valid target.
@@ -4296,11 +4406,9 @@ const Chain = Chainf;
 				const diffX = target.x - this.body.x;
 				const diffY = target.y - this.body.y;
 
-				// Throttle lead calculation.
-				if (this.tick % 5 === 0) {
-					const tracking = this.body.topSpeed;
-					this.lead = timeOfImpact({ x: diffX, y: diffY }, target.velocity, tracking);
-				}
+				const tracking = this.body.topSpeed;
+				this.lead = timeOfImpact({ x: diffX, y: diffY }, target.velocity, tracking);
+				if(this.lead === Infinity) this.lead = 0;
 
 				// Mutate and return the pre-allocated output object.
 				this.output.target.x = diffX + this.lead * target.velocity.x;
@@ -5190,17 +5298,6 @@ const Chain = Chainf;
                     this.destroyOldestChild = PROPERTIES.DESTROY_OLDEST_CHILD == null ? false : PROPERTIES.DESTROY_OLDEST_CHILD;
                     this.shootOnDeath = PROPERTIES.SHOOT_ON_DEATH == null ? false : PROPERTIES.SHOOT_ON_DEATH;
                     this.onDealtDamage = PROPERTIES.ON_DEALT_DAMAGE == null ? null : PROPERTIES.ON_DEALT_DAMAGE;
-                    if (this.shootOnDeath && !this.skipShootOnDeath) this.body.onDead = () => {
-                        let self = this;
-                        for (let i = 0; i < self.body.guns.length; i++) {
-                            let gun = self.body.guns[i];
-                            if (gun.shootOnDeath) {
-                                let gx = gun.offset * Math.cos(gun.direction + gun.angle + gun.body.facing) + (1.35 * gun.length - gun.width * gun.settings.size / 2) * Math.cos(gun.angle + self.body.facing),
-                                    gy = gun.offset * Math.sin(gun.direction + gun.angle + gun.body.facing) + (1.35 * gun.length - gun.width * gun.settings.size / 2) * Math.sin(gun.angle + self.body.facing);
-                                gun.fire(gx, gy, self.body.skill);
-                            }
-                        }
-                    };
                     if (PROPERTIES.COLOR_OVERRIDE != null) this.colorOverride = PROPERTIES.COLOR_OVERRIDE;
                     if (PROPERTIES.CAN_SHOOT != null) this.canShoot = PROPERTIES.CAN_SHOOT;
                     this.alpha = PROPERTIES.ALPHA;
@@ -5346,7 +5443,7 @@ const Chain = Chainf;
                 let speed = (this.negRecoil ? -1 : 1) * this.settings.speed * c.runSpeed * sk.spd * (1 + ss);
                 let s = new Vector(speed * Math.cos(this.angle + this.body.facing + sd), speed * Math.sin(this.angle + this.body.facing + sd));
                 if (this.body.velocity.length) {
-                    let extraBoost = Math.max(1, s.x * this.body.velocity.x + s.y * this.body.velocity.y) / this.body.velocity.length / s.length;
+                    let extraBoost = Math.max(0, s.x * this.body.velocity.x + s.y * this.body.velocity.y) / this.body.velocity.length / s.length;
                     if (extraBoost) {
                         let len = s.length;
                         s.x += this.body.velocity.length * extraBoost * s.x / len;
@@ -5539,8 +5636,7 @@ const Chain = Chainf;
                 "nigg",
                 "trann",
                 "troon"
-            ],
-        sanctuaries = [];
+            ];
         let grid = new HashGrid();/*new QuadTree({
         x: 0,
         y: 0,
@@ -5701,7 +5797,6 @@ const Chain = Chainf;
                         this.sandboxId = this.master.sandboxId;
                     }
                 }
-                this.isInGrid = false;
                 /*this.activation = (() => {
                     let active = true,
                         timer = ran.irandom(15);
@@ -5764,7 +5859,6 @@ const Chain = Chainf;
                 this.y = position.y;
                 this.cx = position.x;
                 this.cy = position.y;
-                this.messages = [];
                 this.velocity = new Vector(0, 0);
                 this.accel = new Vector(0, 0);
                 this.damp = .05;
@@ -5944,7 +6038,7 @@ const Chain = Chainf;
                         control.alt = faucet.alt;
                     }
                 }
-                if (this.settings.attentionCraver && !faucet.main && this.range) {
+                if (this.settings.attentionCraver && !faucet.main && this.range > 1) {
                     this.range--;
                 }
                 for (let i = 0, l = this.controllers.length; i < l; i++) {
@@ -6520,7 +6614,6 @@ const Chain = Chainf;
                     y: this.y,
                     cx: this.altCameraSource?this.altCameraSource[0]:this.x,
                     cy: this.altCameraSource?this.altCameraSource[1]:this.y,
-                    messages: this.messages,
                     vx: this.velocity.x,
                     vy: this.velocity.y,
                     size: this.size,
@@ -7050,18 +7143,18 @@ const Chain = Chainf;
                         break;
                     case "smoothTargetOrSmoothhMotion":
                         if (this.source.control.target.length === 0) {
-                            this.facing += util.loopSmooth(this.facing, Math.atan2(this.velocity.y || c.MIN_SPEED, this.velocity.x || c.MIN_SPEED), 4 / room.speed);
+                            this.facing += util.loopSmooth(this.facing, Math.atan2(this.velocity.y, this.velocity.x), 4 / room.speed);
                         } else {
-                            this.facing += util.loopSmooth(this.facing, Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED), 4 / room.speed);
+                            this.facing += util.loopSmooth(this.facing, Math.atan2(t.y, t.x), 4 / room.speed);
                         }
                         break;
                     case "looseWithMotion":
                         if (!this.velocity.length) break;
                     case "smoothWithMotion":
-                        this.facing += util.loopSmooth(this.facing, Math.atan2(this.velocity.y || c.MIN_SPEED, this.velocity.x || c.MIN_SPEED), 4 / room.speed);
+                        this.facing += util.loopSmooth(this.facing, Math.atan2(this.velocity.y, this.velocity.x), 4 / room.speed);
                         break;
                     case "sans":
-                        this.facing = Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED);
+                        this.facing = Math.atan2(t.y, t.x);
                         entities.forEach((instance) => {
                             if (Math.abs(this.x - instance.x) < 70 && Math.abs(this.y - instance.y) < 70 && "bullet trap swarm drone minion tank miniboss crasher food".includes(instance.type) && instance.team != this.team) {
                                 this.velocity.x += 20 * Math.sin(instance.velocity.direction + (Math.PI / 2));
@@ -7074,7 +7167,7 @@ const Chain = Chainf;
                         });
                         break;
                     case "dodge":
-                        this.facing = Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED);
+                        this.facing = Math.atan2(t.y, t.x);
                         entities.forEach((instance) => {
                             if (Math.abs(this.x - instance.x) < 70 && Math.abs(this.y - instance.y) < 70 && "bullet trap swarm drone minion".includes(instance.type) && instance.team != this.team) {
                                 this.velocity.x += 50 * Math.sin(instance.velocity.direction + (Math.PI / 2));
@@ -7087,7 +7180,7 @@ const Chain = Chainf;
                         });
                         break;
                     case "bossdodge":
-                        this.facing = Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED);
+                        this.facing = Math.atan2(t.y, t.x);
                         entities.forEach((instance) => {
                             if (Math.abs(this.x - instance.x) < 70 && Math.abs(this.y - instance.y) < 70 && "bullet trap swarm drone minion".includes(instance.type) && instance.team != this.team) {
                                 this.velocity.x += 150 * Math.sin(instance.velocity.direction + (Math.PI / 2));
@@ -7100,7 +7193,7 @@ const Chain = Chainf;
                         });
                         break;
                     case "dronedodge":
-                        this.facing = Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED);
+                        this.facing = Math.atan2(t.y, t.x);
                         entities.forEach((instance) => {
                             if (Math.abs(this.x - instance.x) < 70 && Math.abs(this.y - instance.y) < 70 && "bullet trap swarm drone minion".includes(instance.type) && instance.team != this.team) {
                                 this.velocity.x += 50 * Math.sin(instance.velocity.direction + (Math.PI / 2));
@@ -7113,24 +7206,24 @@ const Chain = Chainf;
                         });
                         break;
                     case "toTarget":
-                        this.facing = Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED);
+                        this.facing = Math.atan2(t.y, t.x);
                         break;
                     case "locksFacing":
-                        if (!this.control.alt) this.facing = Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED);
+                        if (!this.control.alt) this.facing = Math.atan2(t.y, t.x);
                         break;
                     case "altLocksFacing":
-                        if (!this.control.fire) this.facing = Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED);
+                        if (!this.control.fire) this.facing = Math.atan2(t.y, t.x);
                         break;
                     case "smoothToTarget":
-                        this.facing += util.loopSmooth(this.facing, Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED), 4 / room.speed);
+                        this.facing += util.loopSmooth(this.facing, Math.atan2(t.y, t.x), 4 / room.speed);
                         break;
                     case "slowToTarget":
-                        this.facing += util.loopSmooth(this.facing, Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED), 8 / room.speed);
+                        this.facing += util.loopSmooth(this.facing, Math.atan2(t.y, t.x), 8 / room.speed);
                         break;
                     case "bound":
                         let givenAngle;
                         if (this.turretRightClick ? this.control.alt : this.control.main) {
-                            givenAngle = Math.atan2(t.y || c.MIN_SPEED, t.x || c.MIN_SPEED);
+                            givenAngle = Math.atan2(t.y, t.x);
                             let diff = util.angleDifference(givenAngle, this.firingArc[0]);
                             if (Math.abs(diff) >= this.firingArc[1]) givenAngle = this.firingArc[0];
                         } else givenAngle = this.firingArc[0];
@@ -7158,18 +7251,18 @@ const Chain = Chainf;
                 this.vfacing = util.angleDifference(oldFacing, this.facing) * room.speed;
             }
             physics() {
-                this.velocity.x += this.accel.x;
-                this.velocity.y += this.accel.y;
+                this.velocity.x += this.accel.x*room.lagComp;
+                this.velocity.y += this.accel.y*room.lagComp;
                 this.accel.null();
                 this.stepRemaining = c.ARENA_TYPE === 1 ? 1.5 : 1;
-                this.x += this.stepRemaining * this.velocity.x / room.speed;
-                this.y += this.stepRemaining * this.velocity.y / room.speed;
+                this.x += (this.stepRemaining * this.velocity.x / room.speed)*room.lagComp;
+                this.y += (this.stepRemaining * this.velocity.y / room.speed)*room.lagComp;
             }
             friction() {
                 let motion = this.velocity.length,
                     excess = (motion - this.maxSpeed) * (c.ARENA_TYPE === 1 ? 1.05 : 1);
                 if (excess > 0 && this.damp) {
-                    let drag = excess / (this.damp / room.speed + 1),
+                    let drag = excess / ((this.damp / room.speed + 1)*room.lagComp),
                         finalvelocity = this.maxSpeed + drag;
                     this.velocity.x = finalvelocity * this.velocity.x / motion;
                     this.velocity.y = finalvelocity * this.velocity.y / motion;
@@ -7494,10 +7587,18 @@ const Chain = Chainf;
                 this.regenerate();
                 this.damageReceived = 0;
                 if (this.isDead()) {
+                    for (let i = 0; i < this.guns.length; i++) {
+                        let gun = this.guns[i];
+                        if (gun.shootOnDeath) {
+                            let gx = gun.offset * Math.cos(gun.direction + gun.angle + gun.body.facing) + (1.35 * gun.length - gun.width * gun.settings.size / 2) * Math.cos(gun.angle + this.facing),
+                                gy = gun.offset * Math.sin(gun.direction + gun.angle + gun.body.facing) + (1.35 * gun.length - gun.width * gun.settings.size / 2) * Math.sin(gun.angle + this.facing);
+                            gun.fire(gx, gy, this.skill);
+                        }
+                    }
                     // Explosions, phases and whatnot
                     if (this.onDead != null && !this.hasDoneOnDead) {
                         this.hasDoneOnDead = true;
-                        this.onDead({sockets, ran, Entity});
+                        this.onDead({sockets, ran, Entity, me: this, them: this.collisionArray[0]});
                     }
                     // Second function so onDead isn't overwritten by specific gamemode features
                     if (this.modeDead != null && !this.hasDoneModeDead) {
@@ -7659,6 +7760,7 @@ const Chain = Chainf;
                 this.invuln = false;
                 this.damageReceived = this.health.max * 2;
                 this.health.amount = -1;
+				this.destroy()
             }
             destroy(skipEvents=false) {
                 if (this.hasDestroyed) {
@@ -7752,7 +7854,7 @@ const Chain = Chainf;
                 if (skipEvents === false) {
                     if (this.onDead != null && !this.hasDoneOnDead) {
                         this.hasDoneOnDead = true;
-                        this.onDead({sockets, ran, Entity});
+                        this.onDead({sockets, ran, Entity, me: this, them: this.collisionArray[0]});
                     }
                     // Second function so onDead isn't overwritten by specific gamemode features
                     if (this.modeDead != null && !this.hasDoneModeDead) {
@@ -8097,7 +8199,7 @@ function flatten(data, out, playerContext = null) {
         let finalTwiggle = data.twiggle;
         let finalColor = data.color ?? 0;
 
-        if (playerContext) {
+        if (playerContext && playerContext.body) {
             // Perspective #1: Autospin
             // If the viewing player has autospin on, the twiggle flag is forced true.
             if (playerContext.command.autospin) {
@@ -8106,8 +8208,8 @@ function flatten(data, out, playerContext = null) {
             
             // Perspective #2: FFA Color Override
             // In FFA, if a player's body color is 'FFA_RED', they see their own bullets as their team color.
-            if (playerContext.gameMode === "ffa" && playerContext.body.color === "FFA_RED" && data.masterId === playerContext.body.id) {
-                finalColor = playerContext.teamColor ?? 0;
+            if (playerContext.gameMode === "ffa" && data.color === "FFA_RED" && playerContext.body.color === "FFA_RED" && data.masterId === playerContext.body.id) {
+				finalColor = playerContext.teamColor ?? 0;
             }
         }
         // --- End of Perspective Logic ---
@@ -8144,7 +8246,7 @@ function flatten(data, out, playerContext = null) {
 
         // Push player-specific data
         if (data.type & 0x04) {
-            out.push(data.name || "", data.score || 0, data.messages ? JSON.stringify(data.messages) : "[]");
+            out.push(data.name || "", data.score || 0);
         }
     }
 
@@ -8166,7 +8268,7 @@ function flatten(data, out, playerContext = null) {
 }
 
         const sockets = (() => {
-            const protocol = workerWindow.require("./lib/fasttalk");
+            const protocol = require("./lib/fasttalk");
             const bans = [];
             const backlog = [];
             let lastConnection = Date.now() - 501;
@@ -8237,7 +8339,7 @@ function flatten(data, out, playerContext = null) {
                     util.log("New socket initiated!");
                     userSockets.set(playerId, this)
                     this.id = id++;
-                    this._socket = userSocket(playerId);
+                    this._socket = userSocket(playerId, protocol.encode);
                     this.sentPackets = 0
                     this.receivedPackets = 0
                     this.camera = {
@@ -8275,7 +8377,7 @@ function flatten(data, out, playerContext = null) {
                     };
                     this._socket.binaryType = "arraybuffer";
                     this._socket.on("message", message => {
-                        this.incoming(message)
+                        this.incoming(protocol.decode(message))
                     });
                     this._socket.on("close", () => {
                         if ("loops" in this) {
@@ -8465,7 +8567,7 @@ function flatten(data, out, playerContext = null) {
                 kick(reason = "Unspecified.") {
                     util.warn(this.readableID + "has been kicked. Reason: " + reason);
                     this.talk("P", "You have been kicked: " + reason)
-                    this.talk("closeSocket")
+					this.close()
                 }
                 ban(reason) {
                     if (this.isBanned) {
@@ -8512,7 +8614,7 @@ function flatten(data, out, playerContext = null) {
                     players = players.filter(player => player.id !== this.id);
                     clients = clients.filter(client => client.id !== this.id);
                     clearInterval(this.animationsInterval);
-                    worker.postMessage({ type: "updatePlayers", players: players.length, name: room.displayName, desc: room.displayDesc })
+                    		worker.postMessage({ type: "updatePlayers", players: clients.length, name: room.displayName, desc: room.displayDesc })
                 }
                 closeWithReason(reason) {
                     this.talk("P", reason);
@@ -8657,18 +8759,15 @@ function flatten(data, out, playerContext = null) {
                                 return 1;
                             }
 
-                            /*if (players.length === 0) {
+                            if (players.length === 0) {
                                 this.betaData = {
                                     permissions: 3,
                                     nameColor: "#ffa600",
-                                    username: "Room Host",
+                                    username: "Much love <3 - Drako hyena",
                                     globalName: "Room Host",
                                     discordID: "1"
                                 }
-                            }*/
-						   // Above is how it used to work but anyone can be the first player here
-						   // permission levels represent the power levels in game
-						   // below is what the player entered for their token input
+                            }
                             this.token = key;
 
                             if (room.testingMode) {
@@ -8752,7 +8851,7 @@ function flatten(data, out, playerContext = null) {
                             this.woomyOnlineSocketId = m[3];
                             util.info(trimName(name) + (isNew ? " joined" : " rejoined") + " the game! Player ID: " + (entitiesIdLog - 1) + ". IP: " + this.ip + ". Players: " + clients.length + ".");
 
-                    		worker.postMessage({ type: "updatePlayers", players: players.length, name: room.displayName, desc: room.displayDesc })
+                    		worker.postMessage({ type: "updatePlayers", players: clients.length, name: room.displayName, desc: room.displayDesc })
                             /*if (this.spawnCount > 0 && this.name != undefined && trimName(name) !== this.name) {
                                 this.error("spawn", "Unknown protocol error!");
                                 return;
@@ -8776,7 +8875,6 @@ function flatten(data, out, playerContext = null) {
                             let body = this.player.body;
                             body.skill.score += Math.pow(this.status.previousScore, 0.7)
                             body.nameColor = this.betaData.nameColor;
-                            body.messages = []
                             this.name = body.name
                             switch (this.name) {
                                 case "4NAX":
@@ -9610,7 +9708,7 @@ function flatten(data, out, playerContext = null) {
                                         if (!body.multibox.enabled) return this.talk("Z", "[ERROR] Multiboxing is already disabled for you.");
                                         this.talk("Z", "[INFO] You have disabled multiboxing for yourself.");
                                         body.multibox.enabled = false;
-                                        body.onDead({sockets, ran, Entity});
+                        				body.onDead({sockets, ran, Entity, me: body, them: body.collisionArray[0]});
                                         return body.onDead = null;
                                     }
                                     this.talk("Z", "[INFO] You are now controlling " + m[1] + " new " + (m[1] > 1 ? "entities" : "entity") + ".");
@@ -9769,25 +9867,9 @@ function flatten(data, out, playerContext = null) {
                         } break;
                         case "cs": // short for chat send
                             // Do they even exist
-                            if (!body?.messages) {
-                                api.apiConnection.talk({
-                                    type: "devalert",
-                                    data: {
-                                        note: "sent message without body",
-                                        ip: this.ip,
-                                        data: "No Text Provided"
-                                    }
-                                })
+                            if (body.isAlive() === false) {
                                 return
                             }
-
-                            // Are they spamming?
-                            if (Date.now() - this.lastChatSend < 500) {
-                                this.talk("m", "You are sending messages too quickly!", "#FF0000")
-                                this.lastChatSend = Date.now()
-                                return
-                            }
-                            this.lastChatSend = Date.now()
 
                             // Parse the message and see if theyre saying some bad words
                             let text = m[0];
@@ -9799,20 +9881,6 @@ function flatten(data, out, playerContext = null) {
                                 }
                             }
                             if (!text.length) return 1;
-                            if (!body?.messages) {
-                                api.apiConnection.talk({
-                                    type: "devalert",
-                                    data: {
-                                        note: "sent message without body",
-                                        ip: this.ip,
-                                        data: text
-                                    }
-                                })
-                                return
-                            }
-
-                            // clear out old chats
-                            body.messages = body.messages.slice(-2).filter(e => Date.now() - e.when < 5000);
 
                             let replaces = {
                                 ":100:": "💯",
@@ -9823,23 +9891,9 @@ function flatten(data, out, playerContext = null) {
                             for (let key in replaces) {
                                 text = text.replace(new RegExp(key, "g"), replaces[key]);
                             }
-
-                            body.messages.push({
-                                text: text,
-                                when: Date.now()
-                            })
-
-                            api.apiConnection.talk({
-                                type: "chat",
-                                data: {
-                                    name: this.name,
-                                    id: body.id,
-                                    text: text,
-                                    discordId: body?.socket?.betaData?.discordID
-                                }
-                            })
-
-
+							for (const socket of clients) {
+								socket.talk("cs", text, this.player.body.id)
+							}
                             break;
                         default:
                             this.error("initialization", `Unknown packet index (${index})`, true);
@@ -10233,7 +10287,7 @@ function flatten(data, out, playerContext = null) {
                 }
             }
         })();
-        workerWindow.sockets = sockets
+        global.sockets = sockets
 
         const gameLoop = (() => {
             const collide = (() => {
@@ -11255,6 +11309,7 @@ function flatten(data, out, playerContext = null) {
                 }*/
                 room.lastCycle = util.time();
                 room.mspt = performance.now() - start;
+				room.lagComp = Math.max(1, room.mspt/room.cycleSpeed)
                 const border = 2150
                 if (c.serverName.includes("Boss Rush") && c.ISSIEGE) {
                     entities.forEach(entity => {
@@ -12615,7 +12670,12 @@ function flatten(data, out, playerContext = null) {
 				grid.getCollisions(searchArea, (entity) => {
 					entity.deactivationTimer = 30;
 					entity.isActive = true;
-                    // Apply necessary checks from the original logic:
+                    
+                    if (entity.animation) {
+                        socket.animationsToDo.set(entity.id, entity.animation);
+                    }
+
+					// Apply necessary checks from the original logic:
                     if (
                         entity.isGhost ||
                         !entity.isAlive() ||
@@ -12628,10 +12688,6 @@ function flatten(data, out, playerContext = null) {
                         // If more precise frustum culling is needed, add a check here, but AABB is usually sufficient for performance gain.
                     ) {
                         return; // Skip entities that don't meet visibility criteria
-                    }
-
-                    if (entity.animation) {
-                        socket.animationsToDo.set(entity.id, entity.animation);
                     }
 
 					numberInView++
@@ -12728,7 +12784,7 @@ function flatten(data, out, playerContext = null) {
         }, 1000);*/
 
         if (room.maxBots > 0) setTimeout(() => util.log(`Spawned ${room.maxBots} AI bot${room.maxBots > 1 ? "s." : "."}`), 350);
-        worker.postMessage({ type: "updatePlayers", players: players.length, name: room.displayName, desc: room.displayDesc })
+        worker.postMessage({ type: "updatePlayers", players: clients.length, name: room.displayName, desc: room.displayDesc })
         worker.postMessage({ type: "serverStarted" })
     })();
 }

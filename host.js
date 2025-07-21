@@ -5,34 +5,31 @@
 //
 
 import { Worker }  from "worker_threads"
-import { NodePeer } from "./webrtc-patch.js";
-import { fasttalk } from "./fasttalk.js";
+import { Peer } from "peerjs-on-node";
 import * as wsLib from "ws"
 
 //
 // PEER
 //
 const iceServers = [
-  { hostname: 'stun.l.google.com', port: 19302 },
-  { hostname: 'stun1.l.google.com', port: 19302 },
-  { hostname: 'stun2.l.google.com', port: 19302 },
-  { hostname: 'stun3.l.google.com', port: 19302 },
-  { hostname: 'stun4.l.google.com', port: 19302 }
+	{ urls: 'stun:stun.l.google.com:19302' },
+	{ urls: 'stun:stun1.l.google.com:19302' },
+	{ urls: 'stun:stun2.l.google.com:19302' },
+	{ urls: 'stun:stun3.l.google.com:19302' },
+	{ urls: 'stun:stun4.l.google.com:19302' },
 ];
 iceServers.fetchTurnCredentials = async function() {
   try {
-    const response = await fetch('https://woomy.online/api/get-turn-credentials');
+    const response = await fetch('http://woomy.online/api/get-turn-credentials');
     if (!response.ok) {
-      console.error(`Failed to fetch TURN credentials: ${response.statusText}`);
+      throw new Error(`Failed to fetch TURN credentials: ${response.statusText}`);
     }
     const turnConfig = await response.json();
     console.log("Successfully fetched TURN credentials.");
     return [{
-		hostname: "74.208.44.199",
-		port: 3478,
+		urls: turnConfig.urls[0]+"?transport=udp",
 		username: turnConfig.username,
-		password: turnConfig.password,
-		relayType: "TurnUdp"
+		credential: turnConfig.password
 	}];
   } catch (error) {
     console.error("Could not get TURN credentials, continuing without them.", error);
@@ -42,9 +39,10 @@ iceServers.fetchTurnCredentials = async function() {
 class PeerWrapper {
 	constructor(iceServersParam) {
 		const servers = iceServers.concat(iceServersParam)
-		this.peer = new NodePeer(crypto.randomUUID(), {
+		console.log(servers)
+		this.peer = new Peer({config:{
 			iceServers: servers
-		});
+		}});
 		this.conn = null;
 		this.id = null;
 		this.onmessage = undefined;
@@ -101,26 +99,14 @@ class PeerWrapper {
 		});
 	}
 
-	send(data) {
-		if (this.conn?.open) {
-			const dc = this.conn.dataChannel; // Access the raw WebRTC data channel
-			const highWaterMark = 4 * 1024 * 1024; // 4MB threshold
-			const checkInterval = 100; // ms
-
-			const trySend = () => {
-				if (dc.bufferedAmount() < highWaterMark) {
-					this.conn.send(data);
-					// console.log(`[Peer ${this.id}] Sent:`, data);
-				} else {
-					setTimeout(trySend, checkInterval);
-				}
-			};
-
-			trySend();
-		} else {
-			console.warn(`[Peer ${this.id}] No open connection`);
-		}
+send(data) {
+	if (this.conn?.open) {
+		this.conn.send(data);;
+	} else {
+		console.warn(`[Peer ${this.id}] No open connection`);
 	}
+}
+
 
 	destroy() {
 		this.conn?.close();
@@ -170,8 +156,7 @@ async function wrmHost() {
 						roomPeers.delete(peer.id)
 					}
 					peer.onmessage = async (msg) => {
-						const data = fasttalk.decode(msg)
-						worker.postMessage({ type: "serverMessage", data: [peer.id, data] })
+						worker.postMessage({ type: "serverMessage", data: [peer.id, msg] })
 					}
 					break;
 				case "hostRoomId":
@@ -213,12 +198,13 @@ async function getHostRoomId(){
 // WORKER/SERVER
 //
 const worker = new Worker('./server.js');
-worker.start = async function (gamemodeCode, gamemodeName) {
+worker.start = async function (gamemodeCode, displayNameOverride, displayDescOverride) {
 	worker.postMessage({
 		type: "startServer",
 		server: {
 			suffix: gamemodeCode,
-			gamemode: gamemodeName,
+			displayName: displayNameOverride,
+			displayDesc: displayDescOverride
 		}
 	});
 	let startPromise = new Promise((res, rej) => {
@@ -234,7 +220,7 @@ worker.start = async function (gamemodeCode, gamemodeName) {
 						console.error(`Peer ${data.playerId} does not exist`)
 						return;
 					}
-					peer.send(fasttalk.encode(data.data));
+					peer.send(data.data);
 					break;
 
 				case "updatePlayers":

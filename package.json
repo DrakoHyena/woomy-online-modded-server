@@ -11,8 +11,8 @@
   "description": "",
   "type": "module",
   "dependencies": {
-    "node-datachannel": "^0.28.0",
-    "peerjs": "^1.5.5",
+    "peerjs-on-node": "^1.0.2",
+    "webrtc": "^1.14.1",
     "ws": "^8.18.2"
   }
 }
