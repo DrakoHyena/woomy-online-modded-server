@@ -5,7 +5,7 @@ import { worker, wrmHost, getHostRoomId } from "./host.js";
 	await wrmHost()
 
 	console.log("# STARTING WORKER")
-	await worker.start("4tdm.json", "[Node.JS] 4TDM", "4TDM Running on a Node.js Modded Server")
+	await worker.start("growth.json", "[Node.JS] Growth", "Growth, Running on a Node.js Modded Server")
 	
 	console.log("🚀 Up and running with room id: "+await getHostRoomId())
 })()
