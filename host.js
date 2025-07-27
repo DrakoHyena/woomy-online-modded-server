@@ -197,7 +197,7 @@ async function getHostRoomId(){
 //
 // WORKER/SERVER
 //
-const worker = new Worker('./server.js');
+const worker = new Worker('./server/server.js');
 worker.start = async function (gamemodeCode, displayNameOverride, displayDescOverride) {
 	worker.postMessage({
 		type: "startServer",

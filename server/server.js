@@ -1,10 +1,11 @@
 import * as fs from "node:fs"
 import { parentPort } from "worker_threads"
+import { assets, ASSET_MAGIC } from "../shared/assets.js";
 
 // COMPAT //
 const worker = typeof parentPort==="undefined"?self:parentPort
-if(typeof global === "undefined") global = worker
-if(typeof fs === "undefined") fs = undefined;
+const global = globalThis
+if(typeof global.fs === "undefined") global.fs = undefined;
 
 global.utility = {
     log: (e) => { console.log("[LOG]", e) }
@@ -25,14 +26,15 @@ worker.onmessage = function (msg) {
 
     switch (data.type) {
         case "startServer":
+            worker.postMessage({ type: "serverStartText", text: "Loading definitions..." })
             import("./definitions.js").then((res) => {
-                worker.postMessage({ type: "serverStartText", text: "Loading definitions..." })
+                worker.postMessage({ type: "serverStartText", text: "Loading game..." })
                 global.initExportCode = res.initExportCode
                 console.log(data.server)
                 startServer(data.server.suffix, res.defExports, data.server.displayName, data.server.displayDesc)
             }).catch((err) => {
                 console.error(err)
-                worker.postMessage({ type: "serverStartText", text: "Error loading definitons", tip: "Please reload the page and try again" })
+                worker.postMessage({ type: "serverStartText", text: "Failed to load definitons", tip: "Please reload the page and try again" })
             })
             break;
         case "serverMessage":
@@ -1545,10 +1547,9 @@ const Chain = Chainf;
         }
 
         let gamemodeConfig = {};
-		const configUrl = "./configs/config-" + configSuffix
         let res = undefined;
 		if(!fs){
-			res = await fetch(configUrl)
+			res = await fetch("../configs/config-" + configSuffix)
         	if (configSuffix.includes(".json")) {
         	    gamemodeConfig = await res.json()
        		} else if (configSuffix.includes(".js")) {
@@ -1557,7 +1558,7 @@ const Chain = Chainf;
         	    console.error("Invalid gamemode file type " + configSuffix)
         	}
 		}else{
-			res = fs.readFileSync(configUrl)
+			res = fs.readFileSync("./configs/config-" + configSuffix, "utf8")
 			if (configSuffix.includes(".json")) {
         	    gamemodeConfig = JSON.parse(res)
        		} else if (configSuffix.includes(".js")) {
@@ -2185,7 +2186,7 @@ const Chain = Chainf;
                         width: rounder(g.width),
                         aspect: rounder(g.aspect),
                         angle: rounder(g.angle),
-                        color: rounder(g.color),
+                        color: g.color,
                         skin: rounder(g.skin),
                         color_unmix: rounder(g.color_unmix),
                         alpha: g.alpha
@@ -2215,7 +2216,7 @@ const Chain = Chainf;
                         y: rounder(p.y),
                         angle: rounder(p.angle),
                         layer: rounder(p.layer),
-                        color: rounder(p.color),
+                        color: p.color,
                         shape: p.shape,
                         fill: p.fill,
                         loop: p.loop,
@@ -4272,7 +4273,7 @@ const Chain = Chainf;
 		ioTypes.nearestDifferentMaster = class extends IO {
 			constructor(body) {
 				super(body);
-				this.tick = 0;       // Frame counter for throttling expensive operations.
+				this.tick = room.cycleSpeed;       // Frame counter for throttling expensive operations.
 				this.lead = 0;       // Calculated lead time for predictive aiming.
 				this.oldHealth = body.health.display();
 				this.targetLock = null;
@@ -4406,7 +4407,7 @@ const Chain = Chainf;
 					this.targetLock = null;
 					this.output.main = false;
 					this.output.fire = false;
-					return this.output;
+					return {};
 				}
 
 				const target = this.targetLock;
@@ -9872,6 +9873,24 @@ function flatten(data, out, playerContext = null) {
                                     return 1;
                             }
                         } break;
+						case "as": // short for asset
+							const values = Object.values(assets)
+							for(let i = 0; i < values.length/2; i++){
+								this.talk("as",
+									values.length/2,
+									values[i].id,
+									values[i].data,
+									values[i].info.path2d,
+									values[i].info.path2dDiv,
+									values[i].info.image,
+									values[i].info.p1,
+									values[i].info.p2,
+									values[i].info.p3,
+									values[i].info.p4,
+								)
+							}
+							if(values.length === 0) this.talk("as", 0, 0)
+						break;
                         case "cs": // short for chat send
                             // Do they even exist
                             if (body.isAlive() === false) {
@@ -12795,3 +12814,5 @@ function flatten(data, out, playerContext = null) {
         worker.postMessage({ type: "serverStarted" })
     })();
 }
+
+export {global}

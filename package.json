@@ -1,7 +1,7 @@
 {
   "name": "woomy-online-revitalized",
   "version": "1.0.0",
-  "main": "webserver.js",
+  "main": "start.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node ./start.js"
@@ -11,6 +11,7 @@
   "description": "",
   "type": "module",
   "dependencies": {
+    "node-pre-gyp": "^0.17.0",
     "peerjs-on-node": "^1.0.2",
     "ws": "^8.18.2"
   }
