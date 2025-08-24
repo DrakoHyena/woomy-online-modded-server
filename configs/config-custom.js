@@ -106,7 +106,6 @@ let map = {
         "SKILL_CHEAT_CAP": 60,
         "SKILL_LEAK": 0,
         "STEALTH": 4,
-        "MIN_SPEED": 0.001,
         "MIN_DAMAGE": 0,
         "MAX_FOOD": 400,
         "MAX_NEST_FOOD": 30,
@@ -127,5 +126,6 @@ let map = {
         "BLACKOUT": false,
         //"GAMEMODE_JS": "", // DOES WORK, Changing this will enable the void walkers code. See server.js to add your own.
         //"KILL_SCORE_FORMULA": "Math.min(x, 2_500_000) * 7 / 8" // DOES WORK, optional, taken from growth
+		"modes": [/*"oneVsOne"*/], // New prefered way to do gamemode effects, array of identifiers
 }
 map

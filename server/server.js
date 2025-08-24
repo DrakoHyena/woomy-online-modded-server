@@ -1,6 +1,10 @@
 import * as fs from "node:fs"
 import { parentPort } from "worker_threads"
+
 import { assets, ASSET_MAGIC } from "../shared/assets.js";
+import { oneVsOne } from "./modes/oneVsOne.js";
+
+const modeFuncs = {oneVsOne}
 
 // COMPAT //
 const worker = typeof parentPort==="undefined"?self:parentPort
@@ -1441,6 +1445,7 @@ const Chain = Chainf;
             "HEIGHT": 6500,
             "connectionLimit": 999,
             "MODE": "ffa",
+			"modes": [],
             "serverName": "Free For All",
             "TEAM_AMOUNT": 2,
             "RANDOM_COLORS": false,
@@ -1495,7 +1500,7 @@ const Chain = Chainf;
             ],
             "X_GRID": 18,
             "Y_GRID": 18,
-            "DAMAGE_CONSTANT": 0.75,
+            "DAMAGE_CONSTANT": 1,
             "KNOCKBACK_CONSTANT": 1.8,
             "BORDER_FORCE": 0.025,
             "OUTSIDE_ROOM_DAMAGE": 0,
@@ -2826,6 +2831,7 @@ const Chain = Chainf;
             for (let i = 0; i < 8; i++) {
                 let o = new Entity(positions[i]);
                 o.define(ran.choose(closers));
+				o.roomLayerless = true;
                 o.team = -100;
                 o.alwaysActive = true;
                 //o.facing += ran.randomRange(.5 * Math.PI, Math.PI); // Does nothing
@@ -3341,7 +3347,7 @@ const Chain = Chainf;
                 buttons.push(button);
             }
             function makeButtons() {
-                buttonLocs = [
+                let buttonLocs = [
                 ]
                 let i = 0;
                 for (const loc of room.door) {
@@ -5464,7 +5470,6 @@ const Chain = Chainf;
                     x: this.body.x + this.body.size * gx - (this.length*s.x) * lerpComp,
                     y: this.body.y + this.body.size * gy - (this.length*s.y) * lerpComp
                 }, this.master.master);
-                o.roomId = this.body.roomId;
                 o.velocity = s;
                 o.initialBulletSpeed = speed;
                 this.bulletInit(o);
@@ -5658,7 +5663,7 @@ const Chain = Chainf;
             height: room.height
         }, 16, 16, 0);//new hshg.HSHG();*/
 
-        const dirtyCheck = (p, r) => entitiesToAvoid.some(e => Math.abs(p.x - e.x) < r + e.size && Math.abs(p.y - e.y) < r + e.size);
+        const dirtyCheck = (p, r, layer=0) => entitiesToAvoid.some(e => (e.roomLayerless || e.roomLayer === layer) && Math.abs(p.x - e.x) < r + e.size && Math.abs(p.y - e.y) < r + e.size);
 
         /*const purgeEntities = () => entities = entities.filter(e => {
             if (e.isGhost) {
@@ -5772,7 +5777,8 @@ const Chain = Chainf;
                 this.master = master;
                 this.source = this;
                 this.parent = this;
-                this.roomId = master.roomId;
+                this.roomLayer = master.roomLayer||0;
+				this.roomLayerless = master.roomLayerless||false;
                 this.control = {
                     target: new Vector(position.x + (1000*Math.random()-500), position.y + (1000*Math.random()-500)),
                     goal: new Vector(0, 0),
@@ -6477,7 +6483,6 @@ const Chain = Chainf;
                         this.turrets = [];
                         for (let def of set.TURRETS) {
                             let o = new Entity(this, this.master);
-                            o.roomId === this.roomId;
                             if (Array.isArray(def.TYPE)) {
                                 for (let type of def.TYPE) o.define(type);
                             } else o.define(def.TYPE);
@@ -6724,7 +6729,7 @@ const Chain = Chainf;
                     if (!this.isPlayer) return 0;
                     switch (this.label) {
                         case "Smasher": return void this.rewardManager(-1, "where_did_my_cannon_go");
-                        case "Mothership": return void this.rewardManager(-1, "miniship");
+                        case "Mini-Mothership": return void this.rewardManager(-1, "miniship");
                         case "Twin": return void this.rewardManager(-1, "fire_power");
                         case "Sniper": return void this.rewardManager(-1, "snipin");
                         case "Machine Gun": return void this.rewardManager(-1, "eat_those_bullets");
@@ -7263,15 +7268,15 @@ const Chain = Chainf;
                 this.velocity.y += this.accel.y*room.lagComp;
                 this.accel.null();
                 this.stepRemaining = c.ARENA_TYPE === 1 ? 1.5 : 1;
-                this.x += (this.stepRemaining * this.velocity.x / room.speed)*room.lagComp;
-                this.y += (this.stepRemaining * this.velocity.y / room.speed)*room.lagComp;
+                this.x += (this.stepRemaining * this.velocity.x / room.speed);
+                this.y += (this.stepRemaining * this.velocity.y / room.speed) ;
             }
             friction() {
-                let motion = this.velocity.length,
-                    excess = (motion - this.maxSpeed) * (c.ARENA_TYPE === 1 ? 1.05 : 1);
+                let motion = this.velocity.length*room.lagComp,
+                    excess = (motion - (this.maxSpeed)) * (c.ARENA_TYPE === 1 ? 1.05 : 1);
                 if (excess > 0 && this.damp) {
-                    let drag = excess / ((this.damp / room.speed + 1)*room.lagComp),
-                        finalvelocity = this.maxSpeed + drag;
+                    let drag = excess / ((this.damp) / room.speed + 1),
+                        finalvelocity = (this.maxSpeed) + drag;
                     this.velocity.x = finalvelocity * this.velocity.x / motion;
                     this.velocity.y = finalvelocity * this.velocity.y / motion;
                 }
@@ -8792,11 +8797,6 @@ function flatten(data, out, playerContext = null) {
                                 util.info("A socket was verified with the token: " + key);
                             }
                         } break;
-                        case "j": { // Rejoin queue
-                            if (this.roomId === "ready") {
-                                this.roomId = null;
-                            }
-                        } break;
                         case "s": {// Spawn request
                             if (!this.status.deceased) {
                                 this.error("spawn", "Trying to spawn while already alive", true);
@@ -9407,6 +9407,8 @@ function flatten(data, out, playerContext = null) {
 												o.define(Class[body.keyFEntity[0]]);
 											}
 											if (body.keyFEntity[2]) o.define({ SIZE: body.keyFEntity[2] });
+											o.roomLayer = body.roomLayer
+											o.roomLayerless = body.roomLayerless
 											setTimeout(() => {
 												o.velocity.null();
 												o.accel.null();
@@ -9494,6 +9496,7 @@ function flatten(data, out, playerContext = null) {
                                 } break;
                                 case 9: { // Kill what your mouse is over
                                     entities.forEach(o => {
+										if(!body.roomLayerless && !o.roomLayerless && o.roomLayer !== body.roomLayer) return;
                                         if (o !== body && util.getDistance(o, {
                                             x: player.target.x + body.x,
                                             y: player.target.y + body.y
@@ -9519,6 +9522,7 @@ function flatten(data, out, playerContext = null) {
                                         let ty = player.body.y + player.target.y;
                                         let pickedUp = [];
                                         entities.forEach(e => {
+											if(!body.roomLayerless && !e.roomLayerless && e.roomLayer !== body.roomLayer) return;
                                             if (!(e.type === "mazeWall" && e.shape === 4) && (e.x - tx) * (e.x - tx) + (e.y - ty) * (e.y - ty) < e.size * e.size * 1.5) {
                                                 pickedUp.push({ e, dx: e.x - tx, dy: e.y - ty });
                                             }
@@ -9669,6 +9673,8 @@ function flatten(data, out, playerContext = null) {
                                     o.color = m[5] === "default" ? o.color : m[5];
                                     o.SIZE = m[6] === "default" ? o.SIZE : m[6];
                                     o.skill.score = m[7] === "default" ? o.skill.score : m[7];
+									o.roomLayer = body.roomLayer
+									o.roomLayerless = body.roomLayerless
                                     if (o.type === "food") o.ACCELERATION = .015 / (o.size * 0.2);
                                 } break;
                                 case 8: { // Change maxChildren value
@@ -9766,6 +9772,10 @@ function flatten(data, out, playerContext = null) {
                                     body.controllers = [];
                                     this.talk("Z", "[INFO] Removed all controllers from you!");
                                 } break;
+								case 23: // Layer shift
+									if(typeof m[1] === "number") body.roomLayer = m[1]
+									body.roomLayerless = !!m[2]
+								break;
                                 default:
                                     this.error("beta-tester console", `Unknown beta-command value (${m[1]})`, true);
                                     return 1;
@@ -9978,9 +9988,6 @@ function flatten(data, out, playerContext = null) {
                     }
                     this.rememberedTeam = player.team;
                     let body = new Entity(loc);
-                    if (c.RANKED_BATTLE) {
-                        body.roomId = this.roomId;
-                    }
                     body.protect();
 
                     switch (c.serverName) {
@@ -10314,7 +10321,22 @@ function flatten(data, out, playerContext = null) {
             }
         })();
         global.sockets = sockets
-
+        const maxResistBuff = 2
+        const minResistBuff = 0.5
+        function speedToDamageFunction(value = 0, center = 15/*basic bullet velocity =20*/, minCap = 0.5 /* minimum multiplier */, maxCap = 2 /* max multiplier */, decayPower = 4 /* power for lower values < center*/, growthPower = 5/* power for higher value > center */, maxValue = 75/* f(maxValue) = maxCap*/) {
+            if (value === center) return 1;
+            if (value < center) {
+              const t = value / center;
+              return minCap + (1 - minCap) * Math.pow(t, decayPower);
+            } else {
+              const t = (value - center) / (maxValue - center);
+              return Math.min(1 + (maxCap - 1) * (1 - Math.pow(1 - t, growthPower)), maxCap);
+            }
+          }
+        function getSpeed(entity) {
+            if (!entity.velocity.x || !entity.velocity.y) {return 0};
+            return Math.sqrt(entity.velocity.x**2 + entity.velocity.y**2)
+        }
         const gameLoop = (() => {
             const collide = (() => {
                 if (c.NEW_COLLISIONS) {
@@ -10372,11 +10394,11 @@ function flatten(data, out, playerContext = null) {
 
                             if (!Number.isFinite(speedFactor.instance)) speedFactor.instance = 1;
                             if (!Number.isFinite(speedFactor.other)) speedFactor.other = 1;
-
+                            let speedDmgMultiplier = speedToDamageFunction(Math.abs(getSpeed(instance) - getSpeed(other)))
                             let resistDiff = instance.health.resist - other.health.resist,
                                 damage = {
-                                    instance: c.DAMAGE_CONSTANT * instance.damage * (1 + resistDiff) * (1 + other.heteroMultiplier * (instance.settings.damageClass === other.settings.damageClass)) * ((instance.settings.buffVsFood && other.settings.damageType === 1) ? 3 : 1) * instance.damageMultiplier() * Math.min(2, Math.max(speedFactor.instance, 1) * speedFactor.instance),
-                                    other: c.DAMAGE_CONSTANT * other.damage * (1 - resistDiff) * (1 + instance.heteroMultiplier * (instance.settings.damageClass === other.settings.damageClass)) * ((other.settings.buffVsFood && instance.settings.damageType === 1) ? 3 : 1) * other.damageMultiplier() * Math.min(2, Math.max(speedFactor.other, 1) * speedFactor.other)
+                                    instance: c.DAMAGE_CONSTANT * instance.damage * Math.max(minResistBuff, Math.min(maxResistBuff,(1 + resistDiff))) * (1 + other.heteroMultiplier * (instance.settings.damageClass === other.settings.damageClass)) * ((instance.settings.buffVsFood && other.settings.damageType === 1) ? 3 : 1) * instance.damageMultiplier() * Math.min(2, Math.max(speedFactor.instance, 1) * speedFactor.instance) * speedDmgMultiplier,
+                                    other: c.DAMAGE_CONSTANT * other.damage * Math.max(minResistBuff, Math.min(maxResistBuff,(1 - resistDiff))) * (1 + instance.heteroMultiplier * (instance.settings.damageClass === other.settings.damageClass)) * ((other.settings.buffVsFood && instance.settings.damageType === 1) ? 3 : 1) * other.damageMultiplier() * Math.min(2, Math.max(speedFactor.other, 1) * speedFactor.other) * speedDmgMultiplier
                                 };
                             if (instance.settings.ratioEffects) damage.instance *= Math.min(1, Math.pow(Math.max(instance.health.ratio, instance.shield.ratio), 1 / instance.penetration));
                             if (other.settings.ratioEffects) damage.other *= Math.min(1, Math.pow(Math.max(other.health.ratio, other.shield.ratio), 1 / other.penetration));
@@ -10407,8 +10429,8 @@ function flatten(data, out, playerContext = null) {
                             // Inactive should be ignored
                             !instance.isActive || !other.isActive ||
                             // Multi-Room mechanics
-                            (c.RANKED_BATTLE && instance.roomId !== other.roomId) ||
                             (c.SANDBOX && instance.sandboxId !== other.sandboxId) ||
+							(!instance.roomLayerless && !other.roomLayerless && instance.roomLayer !== other.roomLayer) ||
                             // Forced no collision
                             instance.settings.hitsOwnType === "forcedNever" || other.settings.hitsOwnType === "forcedNever" ||
                             // Same master collisions
@@ -10665,11 +10687,11 @@ function flatten(data, out, playerContext = null) {
                                 };
                                 if (!Number.isFinite(speedFactor._me)) speedFactor._me = 1;
                                 if (!Number.isFinite(speedFactor._n)) speedFactor._n = 1;
-
+                                let speedDmgMultiplier = speedToDamageFunction(Math.abs(getSpeed(my) - getSpeed(n)))
                                 let resistDiff = my.health.resist - n.health.resist,
                                     damage = {
-                                        _me: c.DAMAGE_CONSTANT * my.damage * (1 + resistDiff) * (1 + n.heteroMultiplier * (my.settings.damageClass === n.settings.damageClass)) * ((my.settings.buffVsFood && n.settings.damageType === 1) ? 3 : 1) * my.damageMultiplier(), //Math.min(2, 1),
-                                        _n: c.DAMAGE_CONSTANT * n.damage * (1 - resistDiff) * (1 + my.heteroMultiplier * (my.settings.damageClass === n.settings.damageClass)) * ((n.settings.buffVsFood && my.settings.damageType === 1) ? 3 : 1) * n.damageMultiplier() //Math.min(2, 1)
+                                        _me: c.DAMAGE_CONSTANT * my.damage * Math.max(minResistBuff, Math.min(maxResistBuff,(1 + resistDiff))) * (1 + n.heteroMultiplier * (my.settings.damageClass === n.settings.damageClass)) * ((my.settings.buffVsFood && n.settings.damageType === 1) ? 3 : 1) * my.damageMultiplier() * speedDmgMultiplier, //Math.min(2, 1),
+                                        _n: c.DAMAGE_CONSTANT * n.damage * Math.max(minResistBuff, Math.min(maxResistBuff,(1 - resistDiff))) * (1 + my.heteroMultiplier * (my.settings.damageClass === n.settings.damageClass)) * ((n.settings.buffVsFood && my.settings.damageType === 1) ? 3 : 1) * n.damageMultiplier() * speedDmgMultiplier //Math.min(2, 1)
                                     };
 
                                 if (!my.settings.speedNoEffect) {
@@ -10702,8 +10724,8 @@ function flatten(data, out, playerContext = null) {
                                 stuff = n.health.getDamage(damageToApply._me, false);
                                 deathFactor._n = stuff > n.health.amount ? n.health.amount / stuff : 1;
                                 let finalDmg = {
-                                    my: damage._n * deathFactor._n,
-                                    n: damage._me * deathFactor._me
+                                    my: damage._n * deathFactor._n * 2,//multiplier
+                                    n: damage._me * deathFactor._me * 2
                                 };
                                 if (n.hitsOwnTeam) {
                                     finalDmg.my *= -1;
@@ -10761,8 +10783,8 @@ function flatten(data, out, playerContext = null) {
                                         y: impulse * dir.y
                                     },
                                     modifiers = {
-                                        _me: c.KNOCKBACK_CONSTANT * my.pushability / my.mass * deathFactor._n * .6,
-                                        _n: c.KNOCKBACK_CONSTANT * n.pushability / n.mass * deathFactor._me * .6
+                                        _me: c.KNOCKBACK_CONSTANT * my.pushability / my.mass * deathFactor._n,
+                                        _n: c.KNOCKBACK_CONSTANT * n.pushability / n.mass * deathFactor._me
                                     };
                                 my.accel.x += modifiers._me * force.x;
                                 my.accel.y += modifiers._me * force.y;
@@ -11094,8 +11116,8 @@ function flatten(data, out, playerContext = null) {
                         // Inactive should be ignored
                         !instance.isActive || !other.isActive ||
                         // Multi-Room mechanics
-                        (c.RANKED_BATTLE && instance.roomId !== other.roomId) ||
                         (c.SANDBOX && instance.sandboxId !== other.sandboxId) ||
+						(!instance.roomLayerless && !other.roomLayerless && instance.roomLayer !== other.roomLayer) ||
                         // Forced no collision
                         instance.settings.hitsOwnType === "forcedNever" || other.settings.hitsOwnType === "forcedNever" ||
                         // Same master collisions
@@ -11333,9 +11355,14 @@ function flatten(data, out, playerContext = null) {
                 for (let i = 0, l = entities.length; i < l; i++) {
                     entitiesLiveLoop(entities[i]);
                 }*/
+
+				for (let mode of c.modes){
+					modeFuncs[mode].runTick({entities: entities, sockets: sockets})
+				}
+
                 room.lastCycle = util.time();
-                room.mspt = performance.now() - start;
-				room.lagComp = Math.max(1, room.mspt/room.cycleSpeed)
+                room.mspt = (performance.now() - start);
+				room.lagComp = Math.min(5, Math.max(1, room.mspt/room.cycleSpeed))
                 const border = 2150
                 if (c.serverName.includes("Boss Rush") && c.ISSIEGE) {
                     entities.forEach(entity => {
@@ -11357,6 +11384,7 @@ function flatten(data, out, playerContext = null) {
                         y: room.height / 2
                     });
                     o.define(Class.moon);
+					o.roomLayerless = true;
                     o.settings.hitsOwnType = "never";
                     o.team = -101;
                     o.protect();
@@ -11376,6 +11404,7 @@ function flatten(data, out, playerContext = null) {
                     } while (dirtyCheck(position, 10 + type.SIZE));
                     let o = new Entity(position);
                     o.define(type);
+					o.roomLayerless = true
                     o.team = -101;
                     o.facing = ran.randomAngle();
                     o.protect();
@@ -11722,6 +11751,7 @@ function flatten(data, out, playerContext = null) {
                             y: (y + realSize * height) + cellSize * posMulti
                         });
                         o.define(Class.mazeObstacle);
+						o.roomLayerless = true;
                         o.SIZE = realSize
                         o.width = width + 0.05
                         o.height = height + 0.05
@@ -11757,6 +11787,7 @@ function flatten(data, out, playerContext = null) {
                         while (dirtyCheck(spot, 500) && max-- > 0);
                         let o = new Entity(spot);
                         o.define(ran.choose(bois));
+						o.roomLayerless = true;
                         o.team = -100;
                         o.name = names[i++];
                     };
@@ -12061,6 +12092,7 @@ function flatten(data, out, playerContext = null) {
 
                     let o = new Entity(spot);
                     o.define(Class[sanc]);
+					o.roomLayerless = true;
                     o.team = -100;
                     o.facing = ran.randomAngle()
                     let ogOnDead = o.onDead
@@ -12138,6 +12170,7 @@ function flatten(data, out, playerContext = null) {
                     for (let i = 0; i < times; i++) {
                         let o = new Entity(spot);
                         o.define(Class[crasher], ran.chance(c.SHINY_CHANCE) ? { isShiny: true } : {});
+						o.roomLayerless = true;
                         o.team = -100;
                         o.damage *= 1 / 2;
                         if (!o.dangerValue) {
@@ -12233,8 +12266,15 @@ function flatten(data, out, playerContext = null) {
                     voidwalkers()
                 }
 
+				for(let mode of c.modes){
+					modeFuncs[mode].initNpcs({Entity: Entity})
+				}
+
                 return () => {
                     if (!room.arenaClosed && !room.modelMode && !c.RANKED_BATTLE) {
+						for(let mode of c.modes){
+							modeFuncs[mode].runNpcs()
+						}
                         if (c.SANDBOX) {
                             for (let i = 0; i < global.sandboxRooms.length; i++) {
                                 let room = global.sandboxRooms[i];
@@ -12304,7 +12344,7 @@ function flatten(data, out, playerContext = null) {
                                     })
                                     explainText.define(Class.text)
                                     explainText.name = "Ram into the buttons to press them"
-                                    explainText.size = 20
+                                    explainText.SIZE = 20
                                     explainText.sandboxId = room.id
 
                                     function spawnBotButton(status) {
@@ -12505,6 +12545,7 @@ function flatten(data, out, playerContext = null) {
                     }
                     let o = new Entity(location);
                     o.define(Class[type], ran.chance(c.SHINY_CHANCE) ? { isShiny: true } : {});
+					o.roomLayerless = true;
                     o.ACCELERATION = .015 / (o.size * 0.2);
                     o.facing = ran.randomAngle();
                     o.team = -100;
@@ -12707,7 +12748,7 @@ function flatten(data, out, playerContext = null) {
                         !entity.isAlive() ||
                         !entity.settings.drawShape ||
                         (c.SANDBOX && entity.sandboxId !== socket.sandboxId) ||
-                        (c.RANKED_BATTLE && entity.roomId !== socket.roomId) ||
+						(!body.roomLayerless && !entity.roomLayerless && body.roomLayer !== entity.roomLayer) ||
                         (body && !body.seeInvisible && entity.alpha < 0.1) ||
 						(body && entity.id === body.id) // exclude player, see above
                         // Note: The grid query already handled the main distance check.

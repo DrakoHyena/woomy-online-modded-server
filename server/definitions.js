@@ -1,3 +1,6 @@
+import { global } from "./server.js"
+import { getAsset } from "../shared/assets.js"
+import "./assetDefs.js";
 var defExports = {}
 
 // Stats
@@ -79,13 +82,13 @@ const stats = {
         spray: 1,
         resist: 2
     },
-    trap: {//buffed - nerfed
-        reload: 39,
+	trap: {//buffed - nerfed
+        reload: 48,
         recoil: 1,
         shudder: .25,
         size: .65,
-        health: 0.7,//1.025
-        damage: .58,//.3
+        health: 0.3,//1.025
+        damage: .7,//.3
         pen: 1.08,
         speed: 4.9,
         maxSpeed: 1,
@@ -109,13 +112,13 @@ const stats = {
         spray: 5,
         resist: 1.25
     },
-    drone: {//nerfed
+    drone: {//nerfed - buffed
         reload: 60,
         recoil: .25,
         shudder: .1,
         size: .6,
-        health: 2.5/*4.334*/, //4.2
-        damage: 0.6/*.334*/,
+        health: 4.334/*4.334*/, //4.2
+        damage: 0.9,/*.334*/ // 0.6,
         pen: 1.1,
         speed: 2.334,
         maxSpeed: 1,
@@ -129,7 +132,7 @@ const stats = {
         recoil: 1,
         shudder: .1,
         size: .7,
-        health: 0.425,//1.6
+        health: 1.6,//1.6
         damage: .425,//.2
         pen: 1,
         speed: 3,
@@ -759,9 +762,9 @@ const stats = {
         recoil: .3,
         shudder: .9,
         size: 1.125,
-        health: .6,//.6
-        damage: .825,//.255
-        pen: .94,
+        health: .95,//.6
+        damage: .95,//.255
+        pen: .95,
         speed: 1.6,
         maxSpeed: 1.2,
         range: 1,
@@ -849,7 +852,7 @@ const stats = {
         recoil: 1.8,//1.75
         shudder: 1,
         size: 1,
-        health: 1.1,
+        health: 1.45,//1.1
         damage: 1.4,//1.65
         pen: 1.05,
         speed: 1,//.875
@@ -879,7 +882,7 @@ const stats = {
         recoil: 1.2,
         shudder: 1,
         size: 1,
-        health: 1.2,//1
+        health: 1.6,//1
         damage: 1.45,//1.2
         pen: 1,
         speed: 1,
@@ -1460,19 +1463,19 @@ const stats = {
         resist: 1.1
     },
     tempest: {
-        reload: .4,
+        reload: .26,
         recoil: 1,
         shudder: 1,
         size: 1,
-        health: 2.5,
-        damage: .3,
-        pen: .7,
-        speed: 6.75,
-        maxSpeed: 1,
+        health: 4,
+        damage: .2,
+        pen: 0.5,
+        speed: .01,
+        maxSpeed: 1.25,
         range: 1,
-        density: 1,
+        density: 10,
         spray: 1,
-        resist: 1
+        resist: 5
     },
     carrier: {
         reload: 1.1,
@@ -1539,8 +1542,8 @@ const stats = {
         recoil: 2,
         shudder: .1,
         size: 1.5,
-        health: 1.8,//1.875
-        damage: 1.1,//1
+        health: 1.25,//1.875
+        damage: 1.35,//1
         pen: .95,
         speed: 1.475,
         maxSpeed: 2.475,
@@ -1554,8 +1557,8 @@ const stats = {
         recoil: 1,
         shudder: 1,
         size: .9,
-        health: 1,
-        damage: 1.525,//1.45
+        health: 1.25,//1
+        damage: 1.1,//1.45
         pen: 1,
         speed: .87,
         maxSpeed: .95,
@@ -3739,13 +3742,13 @@ const stats = {
         spray: 1,
         resist: 1
     },
-    c4: {
+    c4: {//buffed
         reload: 1000,
         recoil: 0,
         shudder: 1,
         size: 1,
         health: 3,
-        damage: 3.15,
+        damage: 6,//.3.15
         pen: 3,
         speed: 0,
         maxSpeed: 0,
@@ -4315,7 +4318,7 @@ const stats = {
         shudder: .6,
         size: .825,
         health: .3,//.21
-        damage: .825,//.185
+        damage: 1.5,//.185
         pen: 1.1,
         speed: 1.475,//1.7
         maxSpeed: 1.25,//1.5
@@ -6108,10 +6111,10 @@ const base = {
     HEALTH: 20,
     DAMAGE: 3/*3*/,
     RESIST: 1,
-    PENETRATION: 1.4/*1.05*/,
-    SHIELD: 8,
+    PENETRATION: 1.05/*1.05*/,
+    SHIELD: 3.5,//8
     REGEN: .025,
-    DENSITY: .35,
+    DENSITY: 1,
     FOV: 1.04,
     PUSHABILITY: 1
 };
@@ -6925,7 +6928,7 @@ const makeHybrid = (type, name, options = {
     output.GUNS.push({
         POSITION: [7, 12, 1.2, 8, 0, 180, 0],
         PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.drone, g.weak]),
+            SHOOT_SETTINGS: combineStats([g.drone/*, g.weak*/, g.less_reload]),
             TYPE: [defExports[options.drone], {
                 INDEPENDENT: true
             }],
@@ -11365,11 +11368,13 @@ defExports.trap = {
     HITS_OWN_TYPE: 'push',
     DIE_AT_RANGE: true,
     BODY: {
-        HEALTH: .5,
-        DAMAGE: 3,
+        HEALTH: base.HEALTH * 0.5,
+        DAMAGE: base.DAMAGE * 1,
         RANGE: 450,
-        DENSITY: 2.5,
-        RESIST: 2.5,
+        PENETRATION: base.PENETRATION * 0.5,
+        DENSITY: base.DENSITY * 0.5,
+        RESIST: base.RESIST * 0.25,
+        PUSHABILITY: base.PUSHABILITY * 0.225,
         SPEED: 0
     }
 };
@@ -14171,7 +14176,7 @@ defExports.basic = {
     LABEL: 'Basic',
     DANGER: 4,
     LEVEL: -1,
-    SHAPE: 0,
+    SHAPE: getAsset("arrowShape"),
     RESET_UPGRADES: true,
     SKILL: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     SKILL_CAP: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
@@ -27237,7 +27242,7 @@ defExports.streamlinerAutoGun = {
         }
     }]
 };
-defExports.weirdTripletAutoGun = {
+defExports.weirdTripletAutoGunMK5 = {
     LABEL: 'Weird Triplet',
     BODY: {
         FOV: 2.2
@@ -27299,7 +27304,7 @@ defExports.MK5_Minion_1 = {
         TYPE: defExports.streamlinerAutoGun
     }, {
         POSITION: [16.8, 0, 0, 0, 360, 1],
-        TYPE: defExports.weirdTripletAutoGun
+        TYPE: defExports.weirdTripletAutoGunMK5
     }],
     GUNS: [{
         POSITION: [5, 2.1, 1.8, 8, 5.5, 180, 0],
@@ -37693,7 +37698,7 @@ defExports.gigaTrapper = {
     }, {
         POSITION: [3.5, 19.5, 1.7, 14.5, 0, 0, 0],
         PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.trap, g.destroy, g.more_range, g.bigger, g.faster, g.bit_more_damage]),
+            SHOOT_SETTINGS: combineStats([g.trap, g.destroy, g.more_range, g.bigger, g.faster, g.bit_more_damage, g.bn2d]),
             TYPE: defExports.trap,
             STAT_CALCULATOR: gunCalcNames.trap
         }
@@ -38574,7 +38579,7 @@ defExports.comet = {
         }]
     }]
 };
-defExports.weirdTripletAutoGun = {
+defExports.weirdTripletAutoGunBetterCommet = {
     BODY: {
         FOV: 1.9
     },
@@ -38738,42 +38743,42 @@ defExports.cometbetter = {
         TYPE: defExports.cometbetterturretbase
     }, {
         POSITION: [3.25, 7, 0, 45, 361, 1],
-        TYPE: [defExports.weirdTripletAutoGun, {
+        TYPE: [defExports.weirdTripletAutoGunBetterCommet, {
             HAS_NO_RECOIL: false
         }]
     }, {
         POSITION: [3.25, 7, 0, 135, 361, 1],
-        TYPE: [defExports.weirdTripletAutoGun, {
+        TYPE: [defExports.weirdTripletAutoGunBetterCommet, {
             HAS_NO_RECOIL: false
         }]
     }, {
         POSITION: [3.25, 7, 0, 225, 361, 1],
-        TYPE: [defExports.weirdTripletAutoGun, {
+        TYPE: [defExports.weirdTripletAutoGunBetterCommet, {
             HAS_NO_RECOIL: false
         }]
     }, {
         POSITION: [3.25, 7, 0, 315, 361, 1],
-        TYPE: [defExports.weirdTripletAutoGun, {
+        TYPE: [defExports.weirdTripletAutoGunBetterCommet, {
             HAS_NO_RECOIL: false
         }]
     }, {
         POSITION: [3.25, 7, 0, 0, 361, 1],
-        TYPE: [defExports.weirdTripletAutoGun, {
+        TYPE: [defExports.weirdTripletAutoGunBetterCommet, {
             HAS_NO_RECOIL: false
         }]
     }, {
         POSITION: [3.25, 7, 0, 90, 361, 1],
-        TYPE: [defExports.weirdTripletAutoGun, {
+        TYPE: [defExports.weirdTripletAutoGunBetterCommet, {
             HAS_NO_RECOIL: false
         }]
     }, {
         POSITION: [3.25, 7, 0, 180, 361, 1],
-        TYPE: [defExports.weirdTripletAutoGun, {
+        TYPE: [defExports.weirdTripletAutoGunBetterCommet, {
             HAS_NO_RECOIL: false
         }]
     }, {
         POSITION: [3.25, 7, 0, 270, 361, 1],
-        TYPE: [defExports.weirdTripletAutoGun, {
+        TYPE: [defExports.weirdTripletAutoGunBetterCommet, {
             HAS_NO_RECOIL: false
         }]
     }]
@@ -46441,7 +46446,7 @@ defExports.longRanger = {
     BODY: {
         ACCELERATION: base.ACCEL * .5,
         SPEED: base.SPEED * .75,
-        FOV: 2.65//buffed 1.5
+        FOV: 1.5//buffed 1.5
     },
     GUNS: [{
         POSITION: [36, 8.5, 1, 0, 0, 0, 0],
@@ -47361,7 +47366,7 @@ defExports.teraTrapper = {
     }, {
         POSITION: [3.6, 28, 1.6, 16, 0, 0, 0],
         PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.trap, g.destroy, g.anni, g.decentralize, g.more_range, g.bigger, g.more_power, g.more_power, g.much_more_recoil]),
+            SHOOT_SETTINGS: combineStats([g.trap, g.destroy, g.anni, g.decentralize, g.more_range, g.bigger, g.more_power, g.more_power, g.much_more_recoil, g.bn3d, g.half_reload]),
             TYPE: defExports.trap,
             STAT_CALCULATOR: gunCalcNames.trap
         }
@@ -89201,6 +89206,7 @@ defExports.nukeShoe = {
     LABEL: 'Nuke',
     SHAPE: 231,
     INDEPENDENT: true,
+	PERSISTS_AFTER_DEATH: true,
     GUNS: [{
         POSITION: [9, 8, 1, 0, 0, 0, 0],
         PROPERTIES: {
@@ -93033,6 +93039,7 @@ defExports.miniNukeShoe = {
     LABEL: 'Nuke',
     SHAPE: 231,
     INDEPENDENT: true,
+	PERSISTS_AFTER_DEATH: true,
     GUNS: [{
         POSITION: [2, 5, 1, 0, 0, 0, 0],
         PROPERTIES: {
@@ -195097,7 +195104,7 @@ branch("dreadnoughts", "Dreadnoughts", [
 
 // Featured Tanks
 branch("featured_tanks", "Featured Tanks", [
-    defExports.triGigaTrapper, defExports.bigCrunch, defExports.bigBang, defExports.antimatter, defExports.gravityWall, defExports.gigaGravyGuy, defExports.blackHoleThrower, defExports.riftWizard, defExports.basic
+    defExports.tempest, defExports.basic
 ], "testbed_parent");
 
 branch("testbed_admin", "Admin Testbed", [
