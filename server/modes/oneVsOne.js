@@ -128,18 +128,18 @@ oneVsOne.runTick = function (args) {
 		}
 		if (matchTime < 0) {
 			if (fighter1.shield.amount > 1) {
-				fighter1.shield.amount /= 4;
-				fighter1.shield.amount -= 5;
+				fighter1.shield.amount /= 1.1;
+				fighter1.shield.amount -= 3;
 			} else if (fighter1.health.amount > 1) {
-				fighter1.health.amount /= 4;
-				fighter1.health.amount -= 5;
+				fighter1.health.amount /= 1.1;
+				fighter1.health.amount -= 3;
 			}
 			if (fighter2.shield.amount > 1) {
-				fighter2.shield.amount /= 4;
-				fighter2.shield.amount -= 5;
+				fighter2.shield.amount /= 1.1;
+				fighter2.shield.amount -= 3;
 			} else if (fighter2.health.amount > 1) {
-				fighter2.health.amount /= 4;
-				fighter2.health.amount -= 5;
+				fighter2.health.amount /= 1.1;
+				fighter2.health.amount -= 3;
 			}
 		}
 	}, 100)
