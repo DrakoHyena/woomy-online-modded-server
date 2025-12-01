@@ -19,7 +19,7 @@ global.process = {
     argv: []
 };
 
-const SERVER_PROTOCOL_VERSION = 1;
+const SERVER_PROTOCOL_VERSION = 2;
 
 // MULTIPLAYER //
 const userSockets = new Map()
@@ -27,15 +27,14 @@ const bannedPlayers = [];
 
 worker.onmessage = function (msg) {
     const data = msg.data
-
     switch (data.type) {
         case "startServer":
             worker.postMessage({ type: "serverStartText", text: "Loading definitions..." })
             import("./definitions.js").then((res) => {
                 worker.postMessage({ type: "serverStartText", text: "Loading game..." })
                 global.initExportCode = res.initExportCode
-                console.log(data.server)
-                startServer(data.server.suffix, res.defExports, data.server.displayName, data.server.displayDesc)
+                console.log("SERVER START DATA:", data.server)
+                startServer(data.server.suffix, res.defExports, data.server.displayName, data.server.displayDesc, data.server.maxPlayers, data.server.maxBots)
             }).catch((err) => {
                 console.error(err)
                 worker.postMessage({ type: "serverStartText", text: "Failed to load definitons", tip: "Please reload the page and try again" })
@@ -55,6 +54,7 @@ worker.onmessage = function (msg) {
 			for(let [k,v] of userSockets){
 				v.talk("nrid", data.id)
 			}
+			if(global.updateRoomInfo) global.updateRoomInfo();
 			break;
     }
 }
@@ -931,7 +931,8 @@ global.require = function (thing) {
 
 // THE SERVER //
 
-async function startServer(configSuffix, defExports, displyNameOverride, displayDescOverride) {
+async function startServer(configSuffix, defExports, displyNameOverride, displayDescOverride, maxPlayersOverride, botAmountOverride) {
+	configSuffix = configSuffix || "4tdm.json"
     //configSuffix = "blackout4tdm.json" 
     /*jslint node: true */
     /*jshint -W061 */
@@ -1014,6 +1015,11 @@ async function startServer(configSuffix, defExports, displyNameOverride, display
                     }
                 }
             }
+        }
+
+        getCell(x, y){
+            const key = ((x >> this.cellShift) << 16) | ((y >> this.cellShift) & 0xFFFF);
+            return this.grid.get(key);
         }
 
         getCollisions(object, optFunct) {
@@ -1436,7 +1442,7 @@ const Chain = Chainf;
             "BETA": 0,
             "networkFrontlog": 1,
             "networkFallbackTime": 150,
-            "visibleListInterval": 40,
+            "visibleListInterval": 38,
             "gameSpeed": 1,
             "runSpeed": 1.75,
             "maxHeartbeatInterval": 1000,
@@ -1622,7 +1628,6 @@ const Chain = Chainf;
                     let finalTank = defs[Math.random() * defs.length | 0][1]
                     finalTank.GUNS = []
                     finalTank.TURRETS = []
-                    finalTank.LASERS = []
                     finalTank.PROPS = []
 
                     for (let i = 0; i < CONFIG.usedTanks; i++) {
@@ -1741,7 +1746,7 @@ const Chain = Chainf;
                 this.testingMode = c.testingMode;
                 this.speed = c.gameSpeed;
                 this.timeUntilRestart = c.restarts.interval;
-                this.maxBots = c.BOTS;
+                this.maxBots = botAmountOverride ?? c.BOTS;
                 this.maxFood = config.MAX_FOOD;
                 this.maxNestFood = config.MAX_NEST_FOOD;
                 this.maxCrashers = config.MAX_CRASHERS;
@@ -2205,16 +2210,6 @@ const Chain = Chainf;
                         out.angle = rounder(t.bound.angle);
                         return applyDefaults(out);
                     }),
-                    lasers: e.lasers.map(l => ({
-                        offset: rounder(l.offset),
-                        direction: rounder(l.direction),
-                        length: rounder(l.length),
-                        width: rounder(l.width),
-                        aspect: rounder(l.aspect),
-                        angle: rounder(l.angle),
-                        color: rounder(l.color),
-                        laserWidth: rounder(l.laserWidth)
-                    })),
                     props: e.props.map(p => ({
                         size: rounder(p.size),
                         x: rounder(p.x),
@@ -2224,13 +2219,16 @@ const Chain = Chainf;
                         color: p.color,
                         shape: p.shape,
                         fill: p.fill,
+						stroke: p.stroke,
                         loop: p.loop,
                         isAura: p.isAura,
                         rpm: p.rpm,
-                        specific: p.specific,
                         dip: p.dip,
                         ring: p.ring,
-                        arclen: p.arclen
+                        arclen: p.arclen,
+						lockRot: p.lockRot,
+						scaleSize: p.scaleSize,
+						tankOrigin: p.tankOrigin
                     }))
                 };
 
@@ -4161,9 +4159,7 @@ const Chain = Chainf;
                 if (input.alt) {
                     for (let i = 0; i < this.body.guns.length; i++) {
                         let gun = this.body.guns[i];
-                        let gx = gun.offset * Math.cos(gun.direction + gun.angle + gun.body.facing) + (1.35 * gun.length - gun.width * gun.settings.size / 2) * Math.cos(gun.angle + this.body.facing),
-                            gy = gun.offset * Math.sin(gun.direction + gun.angle + gun.body.facing) + (1.35 * gun.length - gun.width * gun.settings.size / 2) * Math.sin(gun.angle + this.body.facing);
-                        gun.fire(gx, gy, this.body.skill);
+                        gun.fire(this.body.skill);
                     }
                     this.body.kill();
                     let gun = this.body.master.guns[this.body.gunIndex];
@@ -4185,6 +4181,24 @@ const Chain = Chainf;
                 }
             }
         }
+		ioTypes.leashed = class extends IO {
+			constructor(body, range){
+				super(body);
+				this.range = range;
+			}
+			think() {
+				if(!this.body.leash) this.body.leash = {x: 0, y: 0, range: this.range, leasher: this.body.source};
+				if(!this.body.leash.leasher || !this.body.leash.leasher.isAlive()){
+					this.body.leash.leasher = this.body;
+				}
+				this.body.leash.x = this.body.leash.leasher.x;
+				this.body.leash.y = this.body.leash.leasher.y;
+				if(((this.body.source.x-this.body.x)**2+(this.body.source.y-this.body.y)**2)**.5 > this.body.leash.range){
+					this.body.velocity.x += (this.body.leash.leasher.x - this.body.x)/(this.body.leash.range)
+					this.body.velocity.y += (this.body.leash.leasher.y - this.body.y)/(this.body.leash.range)
+				}
+			}
+		}
         ioTypes.alwaysFire = class extends IO {
             constructor(body) {
                 super(body);
@@ -4261,21 +4275,6 @@ const Chain = Chainf;
                 }
             }
         }
-        ioTypes.skipBomb = class extends IO {
-            constructor(body) {
-                super(body);
-                this.time = 15;
-                this.initialAngle = body.velocity.direction;
-            }
-            think(input) {
-                this.time--;
-                if (this.time <= 0) {
-                    this.time = 15;
-                    let angle = this.initialAngle + (Math.random() * (Math.PI / 2) - (Math.PI / 4));
-                    this.body.velocity = new Vector(Math.cos(angle) * this.body.initialBulletSpeed, Math.sin(angle) * this.body.initialBulletSpeed);
-                }
-            }
-        }
 		ioTypes.nearestDifferentMaster = class extends IO {
 			constructor(body) {
 				super(body);
@@ -4290,11 +4289,6 @@ const Chain = Chainf;
 					fire: false,
 					main: false,
 				};
-
-				// Pre-calculate cosine for fast dot-product checks in the firing arc.
-				if (this.body.firingArc) {
-					this.firingArcCos = Math.cos(this.body.firingArc[1]);
-				}
 			}
 
 			findTarget(range) {
@@ -4303,7 +4297,7 @@ const Chain = Chainf;
 				const master = body.master.master;
 				const pos = body.aiSettings.SKYNET ? body : master;
 				const myTeam = master.team;
-				const { FARMER, IGNORE_SHAPES, view360 } = body.aiSettings;
+				const { FARMER, IGNORE_SHAPES, view360, TARGET_EVERYTHING } = body.aiSettings;
 				const { seeInvisible, isArenaCloser, firingArc } = body;
 				const canSeeInvis = seeInvisible || isArenaCloser;
 
@@ -4317,9 +4311,7 @@ const Chain = Chainf;
 				};
 
 				let bestTarget = null;
-				// Renamed maxDanger to maxValue to reflect the new combined metric.
 				let maxValue = -Infinity; 
-				let maxDist = -Infinity
 				let foundLockedTarget = false;
 
 				// HOT PATH: This callback runs for every potential target.
@@ -4336,19 +4328,23 @@ const Chain = Chainf;
 					switch (entity.type) {
 						case "drone": case "minion": case 'tank': case 'miniboss': case 'crasher': break;
 						case 'food': if (IGNORE_SHAPES) return; break;
-						default: return;
+						default: if(!TARGET_EVERYTHING) return;
 					}
 
-					// Firing arc check using dot product; much faster than `atan2`.
-					if (firingArc && !view360) {
-						const angleToTarget = { x: entity.x - body.x, y: entity.y - body.y };
-						const dot = angleToTarget.x * Math.cos(firingArc[0]) + angleToTarget.y * Math.sin(firingArc[0]);
-						if (dot < 0) return;
 
-						const angleToTargetMag = Math.sqrt(angleToTarget.x * angleToTarget.x + angleToTarget.y * angleToTarget.y);
+                    if (firingArc && !view360) {
+                        const angleToTarget = { x: entity.x - body.x, y: entity.y - body.y };
+                        const dot = angleToTarget.x * Math.cos(firingArc[0]) + angleToTarget.y * Math.sin(firingArc[0]);
+                        const angleToTargetMag = Math.hypot(angleToTarget.x, angleToTarget.y);
 						if (angleToTargetMag === 0) return;
+                        const normalized = dot / angleToTargetMag;
+                        if (normalized < Math.cos(this.body.firingArc[1])) return;
+                    }
 
-						if ((dot / angleToTargetMag) < this.firingArcCos) return;
+					// Our current target is still valid at this point
+					if (this.targetLock === entity) {
+						foundLockedTarget = true;
+						return;
 					}
 
 					// Calculate distance between the current body and the potential target entity.
@@ -4356,26 +4352,19 @@ const Chain = Chainf;
 					const dy = entity.y - body.y;
 					const distance = Math.sqrt(dx * dx + dy * dy);
 
-					// Calculate the effective value, incorporating distance as 1/3 as valuable as danger.
-					// This means distance applies a buff: (distance / 3) increases the dangerValue.
-					const effectiveValue = (entity.dangerValue||1) * distance;
-
-					// If the current target's effective value is less than the best found so far, skip it.
-					if (effectiveValue < maxValue) return;
-
-					// Update the best target if the current one has a higher effective value,
-					if(maxValue <= effectiveValue && maxDist < distance){
+					const effectiveValue = (entity.dangerValue||1) / distance;
+					if(maxValue <= effectiveValue){
 						bestTarget = entity;
 						maxValue = effectiveValue;
-						maxDist = distance
-					}
-
-					if (this.targetLock === entity) {
-						foundLockedTarget = true;
 					}
 				});
 
-				this.targetLock = foundLockedTarget ? this.targetLock : bestTarget;
+				if(foundLockedTarget){
+					this.targetLock = this.targetLock;
+				}else{
+					this.targetLock = bestTarget;
+					this.tick = room.cycleSpeed+1;
+				}
 			}
 
 			think(input) {
@@ -4437,14 +4426,18 @@ const Chain = Chainf;
             constructor(body) {
                 super(body);
                 this.goal = room.randomType("norm");
+				this.tick = 0;
             }
             think(input) {
                 if (input.main || input.alt || this.body.master.autoOverride) {
+					this.tick = 0;
                     return {};
                 }
-                while (util.getDistance(this.goal, this.body) < this.body.SIZE * 2) {
-                    this.goal = room.randomType(Math.random() > .8 ? "nest" : "norm");
-                }
+				if(++this.tick > room.cycleSpeed){
+		            while (util.getDistance(this.goal, this.body) < this.body.SIZE * 2) {
+                    	this.goal = room.randomType(Math.random() > .8 ? "nest" : "norm");
+                	}
+				}
                	return {
                     goal: this.goal,
 					target: {
@@ -5262,6 +5255,7 @@ const Chain = Chainf;
                 this.labelOverride = "";
                 this.controllers = [];
                 this.childrenMap = new Map();
+				this.laserMap = new Map();
                 this.control = {
                     target: new Vector(0, 0),
                     goal: new Vector(0, 0),
@@ -5339,6 +5333,15 @@ const Chain = Chainf;
                     this.canShoot = false
                 }
             }
+			getEnd(speedVec = {x: 0, y: 0}, lerpComp = 0, length){
+				length = length ?? this.length
+				const gx = this.offset * Math.cos(this.direction + this.angle + this.body.facing) + (length - this.width * this.settings.size / 2) * Math.cos(this.angle + this.body.facing)
+				const gy = this.offset * Math.sin(this.direction + this.angle + this.body.facing) + (length - this.width * this.settings.size / 2) * Math.sin(this.angle + this.body.facing)
+				return {
+					x: this.body.x + this.body.size * gx - (length*speedVec.x) * lerpComp,
+					y: this.body.y + this.body.size * gy - (length*speedVec.y) * lerpComp
+				}
+			}
             newRecoil() {
                 let recoilForce = this.settings.recoil * 2 / room.speed;
                 this.body.accel.x -= recoilForce * Math.cos(this.recoilDir || 0);
@@ -5392,8 +5395,6 @@ const Chain = Chainf;
                                     shootPermission = false;
                                 }
                             }
-                            let gx = this.offset * Math.cos(this.direction + this.angle + this.body.facing) + (1.35 * this.length - this.width * this.settings.size / 2) * Math.cos(this.angle + this.body.facing),
-                                gy = this.offset * Math.sin(this.direction + this.angle + this.body.facing) + (1.35 * this.length - this.width * this.settings.size / 2) * Math.sin(this.angle + this.body.facing);
                             if (shootPermission && this.cycle >= 1) {
                                 /*
                                     * This exists, and should not be removed!!
@@ -5409,10 +5410,10 @@ const Chain = Chainf;
                                 } else {
                                     if (!this.body.variables.emp || this.body.variables.emp == undefined || !this.body.master.variables.emp || this.body.master.variables.emp == undefined) {
                                         if (this.onFire) {
-                                            this.onFire(this, [gx, gy, sk]);
+                                            this.onFire(this, sk);
                                         } else {
                                             for (let i = 0; i < this.timesToFire; i++) {
-                                                this.fire(gx, gy, sk);
+                                                this.fire(sk);
                                             }
                                         }
                                     }
@@ -5440,9 +5441,12 @@ const Chain = Chainf;
                         });
                         child.refreshBodyAttributes();
                     })
+					this.laserMap.forEach((laser)=>{
+						laser.refreshStats()
+					})
                 }
             }
-            fire(gx, gy, sk) {
+            fire(sk) {
                 if (this.shootOnce) {
                     this.canShoot = false;
                 }
@@ -5456,25 +5460,26 @@ const Chain = Chainf;
                 sd *= Math.PI / 180;
                 let speed = (this.negRecoil ? -1 : 1) * this.settings.speed * c.runSpeed * sk.spd * (1 + ss);
                 let s = new Vector(speed * Math.cos(this.angle + this.body.facing + sd), speed * Math.sin(this.angle + this.body.facing + sd));
-                if (this.body.velocity.length) {
-                    let extraBoost = Math.max(0, s.x * this.body.velocity.x + s.y * this.body.velocity.y) / this.body.velocity.length / s.length;
+                const vel = this.body.velocity;
+                if (vel.length) {
+                    let extraBoost = Math.max(0, s.x * vel.x + s.y * vel.y) / vel.length / s.length;
                     if (extraBoost) {
                         let len = s.length;
-                        s.x += this.body.velocity.length * extraBoost * s.x / len;
-                        s.y += this.body.velocity.length * extraBoost * s.y / len;
+                        s.x += vel.length * extraBoost * s.x / len;
+                        s.y += vel.length * extraBoost * s.y / len;
                     }
                 }
-				// Client lerp makes it look like bullets dont come from barrels
-				const lerpComp = .75; // % of barrel length to spawn bullet (1-2)
-                let o = new Entity({
-                    x: this.body.x + this.body.size * gx - (this.length*s.x) * lerpComp,
-                    y: this.body.y + this.body.size * gy - (this.length*s.y) * lerpComp
-                }, this.master.master);
-                o.velocity = s;
-                o.initialBulletSpeed = speed;
-                this.bulletInit(o);
-                o.coreSize = o.SIZE;
-                return o;
+
+                if(this.bulletTypes[0].TYPE === "laser"){
+                    new Laser(this, this.getEnd(), sd, typeof this.bulletTypes[1] === "object" ? Object.assign({}, this.bulletTypes[0], this.bulletTypes[1]) : this.bulletTypes[0])
+					return;
+                } else {
+                    let o = new Entity(this.getEnd(s, .6), this.master.master);
+                    // Set velocity first so bulletInit can use it to set proper facing/firing
+                    o.velocity = s;
+                    this.bulletInit(o);
+                    return o;
+				}
             }
             bulletInit(o) {
                 o.source = this.body;
@@ -5505,7 +5510,7 @@ const Chain = Chainf;
                 // Define size
                 o.SIZE = (this.body.size * this.width * this.settings.size * 0.5) * o.squiggle
                 // Define label
-                o.label = this.master.label + (this.label ? " " + this.label : "") + "" + o.label
+                o.label = this.master.label +  "'s " + (this.label ?  + this.label : "") + o.label
 
                 if (o.type === "food") {
                     o.ACCELERATION = .015 / (o.size * 0.2);
@@ -5570,36 +5575,6 @@ const Chain = Chainf;
                 return out;
             }
         }
-        class Laser {
-            constructor(body, info) {
-                // basic info y'know
-                this.body = body;
-                this.master = body.source;
-                this.control = {
-                    target: new Vector(0, 0),
-                    goal: new Vector(0, 0),
-                    main: false,
-                    alt: false,
-                    fire: false
-                };
-                // dimensions, basically ripped from guns
-                let position = info.POSITION;
-                this.length = position[0] / 10;
-                this.width = position[1] / 10;
-                this.aspect = position[2];
-                let offset = new Vector(position[3], position[4]);
-                this.angle = position[5] * Math.PI / 180;
-                this.direction = offset.direction;
-                this.offset = offset.length / 10;
-                // if there are properties, use them
-                if (info.PROPERTIES != null) {
-                    let props = info.PROPERTIES;
-                    this.color = props.COLOR;
-                    this.dps = props.DPS;
-                    this.laserWidth = props.WIDTH;
-                }
-            }
-        }
         class Prop {
             constructor(info) {
                 let pos = info.POSITION;
@@ -5610,46 +5585,55 @@ const Chain = Chainf;
                 this.layer = pos[4];
                 this.shape = info.SHAPE;
                 this.color = info.COLOR || -1;
-                this.fill = info.FILL == undefined ? true : false;
-                this.loop = info.LOOP == undefined ? true : false;
-                this.isAura = info.IS_AURA == undefined ? false : true;
+                this.fill = info.FILL != undefined ? info.FILL : true;
+				this.stroke = info.STROKE != undefined ? info.STROKE : true;
+                this.loop = info.LOOP != undefined ? info.LOOP : true;
+                this.isAura = info.IS_AURA != undefined ? info.IS_AURA : false;
                 this.ring = info.RING;
-                this.arclen = info.ARCLEN == undefined ? 1 : info.ARCLEN;
-                this.rpm = info.RPM;
-                this.specific = info.SPECIFIC == undefined ? 0 : info.SPECIFIC;
-                this.dip = info.DIP === undefined ? 1 : info.DIP;
+                this.arclen = info.ARCLEN != undefined ? info.ARCLEN : 1;
+                this.rpm = info.RPM != undefined ? info.RPM : false;
+                this.dip = info.DIP != undefined ? info.DIP : 1;
+				this.lockRot = info.LOCK_ROT != undefined ? info.LOCK_ROT : true;
+				this.scaleSize = info.SCALE_SIZE != undefined ? info.SCALE_SIZE : true;
+				this.tankOrigin = info.TANK_ORIGIN != undefined ? info.TANK_ORIGIN : true;
+				if(this.isAura === true) this.stroke = false;
             }
         }
-        let bots = [],
-            entitiesToAvoid = [],
-            entities = new Chain(),
-            bot = null,
-            players = [],
-            clients = [],
-            multitabIDs = [],
-            connectedIPs = [],
-            entitiesIdLog = 1,
-            startingTank = c.serverName.includes("Testbed Event") ? "event_bed" : ran.chance(1 / 25000) ? "tonk" : "basic",
-            blockedNames = [ // I have a much longer list, across alot of languages. Might add it
-                "fuck",
-                "bitch",
-                "cunt",
-                "shit",
-                "pussy",
-                "penis",
-                "nigg",
-                "penis",
-                "dick",
-                "whore",
-                "dumbass",
-                "fag"
-            ],
-            bannedPhrases = [
-                "fag",
-                "nigg",
-                "trann",
-                "troon"
-            ];
+        let bots = [];
+        let entitiesToAvoid = [];
+        let entities = new Chain();
+        let bot = null;
+        let players = [];
+        let clients = [];
+		global.updateRoomInfo = () => {
+			const obj = { type: "updatePlayers", players: clients.length, maxPlayers: maxPlayersOverride, name: room.displayName, desc: room.displayDesc };
+			console.log("Updating room info in WRM", obj)
+			worker.postMessage(obj)
+		}
+        let multitabIDs = [];
+        let connectedIPs = [];
+        let entitiesIdLog = 1;
+        let startingTank = c.serverName.includes("Testbed Event") ? "event_bed" : ran.chance(1 / 25000) ? "tonk" : "basic";
+        let blockedNames = [ // I have a much longer list, across alot of languages. Might add it
+            "fuck",
+            "bitch",
+            "cunt",
+            "shit",
+            "pussy",
+            "penis",
+            "nigg",
+            "penis",
+            "dick",
+            "whore",
+            "dumbass",
+            "fag"
+        ];
+        let bannedPhrases = [
+            "fag",
+            "nigg",
+            "trann",
+            "troon"
+        ];
         let grid = new HashGrid();/*new QuadTree({
         x: 0,
         y: 0,
@@ -5762,6 +5746,223 @@ const Chain = Chainf;
             }
         }
 
+
+		const lasers = new Set();
+		let laserId = 0;
+
+		class Laser {
+		    constructor(gun, startPos, angle, settings = {}) {
+		        this.id = laserId++;
+				this.settings = settings;
+				this.setGun(gun);
+				this.skills = {
+					dmg: this.master?.skill?.dam ?? 0,
+                	len: this.master?.skill?.spd ?? 0,
+                	dur: this.master?.skill?.str ?? 0,
+                	prc: this.master?.skill?.pen ?? 0,
+				}
+				this.scaleWidth = settings.SCALE_WIDTH ?? true;
+				this.refreshStats()
+				this.label = settings.LABEL ?? "Laser";
+				this.persistsAfterDeath = settings.PERSISTS_AFTER_DEATH ?? false;
+				this.clearOnMasterUpgrade = settings.CLEAR_ON_MASTER_UPGRADE ?? true;
+
+				this.color = this.master?.master?.color ?? this.master?.color ?? 16;
+				this.team = this.master?.master?.team ?? this.master?.team ?? -101;
+		        this.hitEntities = new Set();
+		
+				this.followGun = this.settings.FOLLOW_GUN ?? true;
+		        this.layer = this.settings.LAYER ?? this.master?.LAYER ?? 0;
+
+                // Angle passed in should be in the same trig convention as getEnd (cos -> x, sin -> y).
+                // Use the exact angle supplied — do not add a hard-coded 90° offset here.
+                this.angle = (angle ?? 0);
+        		if (this.followGun === false && this.gun.master) this.angle += this.gun.master.facing + this.gun.angle;
+            	this.startPoint = this.gun ? this.gun.getEnd() : { x: startPos.x, y: startPos.y };
+			
+				this.onDealtDamage = this.settings.ON_DEALT_DAMAGE;
+				this.onDealtDamageUniv = this.settings.ON_DEALT_DAMAGE_UNIVERSAL;
+
+		        this.endPoint = { x: 0, y: 0 };
+				this.calcEndPoint();
+		        this.visualEndPoint = { x: this.endPoint.x, y: this.endPoint.y };
+		        
+				lasers.add(this);
+			}
+
+			refreshStats() {
+		        this.width = (this.scaleWidth ? (this.settings.WIDTH??0) + (this.master?.size * this.gun?.width) : this.settings.WIDTH) ?? 5;
+		        this.range = (this.settings.RANGE ?? 300) * (this.skills.len*5);
+		        this.duration = (this.settings.DURATION ?? 300) * (this.skills.dur*20);
+		        this.maxDuration = this.duration;
+		        this.pierce = Math.round((this.settings.PIERCE ?? 1) * this.skills.prc);
+		        this.damage = (this.settings.DAMAGE ?? .1) * (this.skills.dmg/2);
+			}
+		
+			calcEndPoint() {
+			    let angle = this.angle;
+			    if (this.followGun === true && this.gun) {
+			        this.startPoint = this.gun.getEnd({ x: 0, y: 0 }, 0, this.gun.length * 1.5);
+			        if (this.gun.master) angle += this.gun.master.facing + this.gun.angle;
+			        else angle += this.gun.angle;
+			    }
+			    // use same trig convention as getEnd (cos -> x, sin -> y)
+			    this.endPoint.x = this.startPoint.x + this.range * Math.cos(angle);
+			    this.endPoint.y = this.startPoint.y + this.range * Math.sin(angle);
+			}
+
+			setGun(gun){
+				if(this.gun?.laserMap){
+					this.gun.laserMap.delete(this.id);
+				}
+				if(this.master?.laserMap){
+					this.master.laserMap.delete(this.id);
+				}
+				this.gun = gun;
+				this.master = gun?.master;
+				if(this.gun?.laserMap)this.gun.laserMap.set(this.id, this)
+				if(this.master?.laserMap)this.master.laserMap.set(this.id, this)
+			}
+
+			destroy(){
+				this.setGun(undefined);
+				lasers.delete(this);
+			}
+		
+		    tick() {
+		        if (this.maxDuration < this.duration) {
+		            this.maxDuration = this.duration;
+		        }
+		        if (this.duration-- <= 0) {
+		            this.destroy()
+		            return;
+		        }
+		        this.calcEndPoint(); // Recalculate in case range/angle changed
+		        this.hitEntities.clear();
+		        this.visualEndPoint = { x: this.endPoint.x, y: this.endPoint.y };
+			
+				const collectedHits = [];
+			
+		        // 1. Traverse grid to gather all potential targets along the laser's path
+				if(this.endPoint.x === this.startPoint.x) this.endPoint.x += 1;
+				if(this.endPoint.y === this.startPoint.y) this.endPoint.y += 1;
+		        const dx = this.endPoint.x - this.startPoint.x;
+		        const dy = this.endPoint.y - this.startPoint.y;
+		        let cellX = Math.floor(this.startPoint.x / (1 << grid.cellShift));
+		        let cellY = Math.floor(this.startPoint.y / (1 << grid.cellShift));
+		        const endCellX = Math.floor(this.endPoint.x / (1 << grid.cellShift));
+		        const endCellY = Math.floor(this.endPoint.y / (1 << grid.cellShift));
+		        const stepX = (dx > 0 ? 1 : -1);
+		        const stepY = (dy > 0 ? 1 : -1);
+		        const cellSize = 1 << grid.cellShift;
+		        const tDeltaX = Math.abs(cellSize / dx);
+		        const tDeltaY = Math.abs(cellSize / dy);
+		        const nextBoundaryX = (cellX + (stepX > 0 ? 1 : 0)) * cellSize;
+		        const nextBoundaryY = (cellY + (stepY > 0 ? 1 : 0)) * cellSize;
+		        let tMaxX = Math.abs((nextBoundaryX - this.startPoint.x) / dx);
+		        let tMaxY = Math.abs((nextBoundaryY - this.startPoint.y) / dy);
+			
+                const processCell = (cx, cy) => {
+                    const cellContent = grid.getCell(cx * cellSize, cy * cellSize);
+                    if (cellContent) {
+                        for (const entity of cellContent){
+							if (entity.team === this.team || this.hitEntities.has(entity)) continue;
+             				this.hitEntities.add(entity);
+		            		const collisionDetails = this.getCollisionDetails(entity);
+		            		if (collisionDetails){
+								collectedHits.push(collisionDetails);
+		        			}
+						}
+                    }
+                };
+			
+		        processCell(cellX, cellY);
+		        while (collectedHits.length < this.pierce && (cellX !== endCellX || cellY !== endCellY)) {
+		            if (tMaxX < tMaxY) {
+		                tMaxX += tDeltaX;
+		                cellX += stepX;
+		            } else {
+		                tMaxY += tDeltaY;
+		                cellY += stepY;
+		            }
+		            processCell(cellX, cellY);
+		        }
+			
+		        // 3. Sort hits by distance to handle piercing correctly
+		        //collectedHits.sort((a, b) => a.distanceSq - b.distanceSq);
+				// Might not be needed by nature of how arrays works
+			
+		        // 4. Apply damage to pierced targets and update visual end point
+                const piercedCount = Math.min(collectedHits.length, this.pierce);
+                if (this.pierce > 0) {
+                    for (let i = 0; i < piercedCount; i++) {
+                        this.collide(collectedHits[i].entity);
+                    }
+                }
+				if(piercedCount === this.pierce){
+                    this.visualEndPoint = collectedHits[this.pierce-1].closestPoint;
+				}
+			}
+		
+		    getCollisionDetails(entity) {
+		        const laserDX = this.endPoint.x - this.startPoint.x;
+		        const laserDY = this.endPoint.y - this.startPoint.y;
+		        const lenSq = laserDX * laserDX + laserDY * laserDY;
+		        if (lenSq === 0) return null;
+			
+		        const dot = ((entity.x - this.startPoint.x) * laserDX + (entity.y - this.startPoint.y) * laserDY);
+		        const t = Math.max(0, Math.min(1, dot / lenSq));
+			
+                const closestX = this.startPoint.x + t * laserDX;
+                const closestY = this.startPoint.y + t * laserDY;
+		        const distanceX = entity.x - closestX;
+		        const distanceY = entity.y - closestY;
+		        const distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+			
+		        const totalRadius = entity.size + this.width;
+		        if (distanceSquared < (totalRadius * totalRadius)) {
+		            const distFromStartSq = (closestX - this.startPoint.x) ** 2 + (closestY - this.startPoint.y) ** 2;
+		            return {
+		                entity: entity,
+		                closestPoint: { x: closestX, y: closestY },
+		                distanceSq: distFromStartSq
+		            };
+		        }
+		        return null;
+		    }
+		
+            collide(entity) {
+                entity.damageReceived += this.damage;
+				entity.collisionArray.push(this)
+				if(this.master){
+            		if (this.onDealtDamage) {
+            		    this.onDealtDamage(this, entity, this.damage);
+            		}
+            		if (this.onDealtDamageUniv) {
+            		    this.onDealtDamageUniv(this, entity, this.damage);
+            		}
+            		if (this.master && this.master.onDealtDamageUniv) {
+            		    this.master.onDealtDamageUniv(this.master, entity, this.damage);
+            		}
+				}
+				if (entity.onDamaged) entity.onDamaged(entity, null, this.damage)
+            }
+
+            addToPacket(packetArr, playerContext) {
+                packetArr.push(
+                    this.id,
+                    this.startPoint.x,
+                    this.startPoint.y,
+                    this.visualEndPoint.x,
+                    this.visualEndPoint.y,
+					(this.master && playerContext.gameMode === "ffa" && this.color === "FFA_RED" && playerContext.body.color === "FFA_RED" && (this.master.id === playerContext.body.id)||(this.master.master.id === playerContext.body.id)) === true ?  playerContext.teamColor??0 : this.color,
+                    this.width,
+                    this.maxDuration,
+                    this.duration
+                );
+            }
+		}
+
         class Entity {
             constructor(position, master = this) {
                 this.isGhost = false;
@@ -5853,7 +6054,6 @@ const Chain = Chainf;
                 };
                 this.guns = [];
                 this.turrets = [];
-                this.lasers = [];
                 this.props = [];
                 this.upgrades = [];
                 this.settings = {
@@ -5861,6 +6061,7 @@ const Chain = Chainf;
                 };
                 this.aiSettings = {};
                 this.childrenMap = new Map();
+				this.laserMap = new Map();
                 this.SIZE = 1;
                 this.define(Class.genericEntity);
                 this.maxSpeed = 0;
@@ -5877,6 +6078,7 @@ const Chain = Chainf;
                 this.accel = new Vector(0, 0);
                 this.damp = .05;
                 this.collisionArray = [];
+				this.collisionArray.lastUpdate = -1;
                 this.invuln = false;
                 this.godmode = false;
                 this.passive = false;
@@ -5890,13 +6092,13 @@ const Chain = Chainf;
                 this.intervalID = null;
                 this.rainbowLoop = this.rainbowLoop.bind(this);
                 this.keyFEntity = ["square", 5, 0, false];
-                this.isActive = false
+                this.isActive = true
 				this.deactivationTimer = -1;
                 this.deactivation = function(){
 					this.deactivationTimer -= 1;
                     if (this.deactivationTimer < 0) {
 						this.deactivationTimer = 30;
-                        this.isActive = this.alwaysActive || this.isPlayer || (this.source && this.source.isActive) || (this.bond && this.bond.isActive) || false
+                        this.isActive = this.alwaysActive || this.isPlayer || (this.source && this.source.isActive) || (this.bond && this.bond.isActive) || (this.master && this.master.isActive) || false
                     }
                 };
                 /*this.activation = (() => {
@@ -6033,10 +6235,7 @@ const Chain = Chainf;
             }
             life() {
                 // New version of life, let's hope this fucking works
-                if (this.SIZE !== this.coreSize) {
-                    this.coreSize = this.SIZE;
-                    this.refreshFOV();
-                }
+                this.refreshFOV();
                 let control = {
                     altOverride: false
                 }, faucet = {};
@@ -6171,7 +6370,6 @@ const Chain = Chainf;
                 this.guns = [];
                 for (let o of this.turrets) o.destroy();
                 this.turrets = [];
-                this.lasers = [];
                 this.props = [];
             }
             minimalDefine(set) {
@@ -6196,7 +6394,6 @@ const Chain = Chainf;
                 }
                 if (set.SIZE != null) {
                     this.SIZE = set.SIZE * this.squiggle;
-                    if (this.coreSize == null) this.coreSize = this.SIZE;
                 }
                 if (set.LAYER != null) this.LAYER = set.LAYER;
                 this.settings.skillNames = set.STAT_NAMES || 6;
@@ -6253,11 +6450,6 @@ const Chain = Chainf;
                         }
                     };
                 };
-                if (set.LASERS != null) {
-                    let newLasers = [];
-                    for (let def of set.LASERS) newLasers.push(new Laser(this, def));
-                    this.lasers = newLasers;
-                }
                 if (set.PROPS != null) {
                     let newProps = [];
                     for (let def of set.PROPS) newProps.push(new Prop(def));
@@ -6304,9 +6496,6 @@ const Chain = Chainf;
                     if (set.FACING_TYPE != null) this.facingType = set.FACING_TYPE;
                     if (set.DRAW_HEALTH != null) this.settings.drawHealth = set.DRAW_HEALTH;
                     if (set.DRAW_SELF != null) this.settings.drawShape = set.DRAW_SELF;
-                    if (set.DAMAGE_EFFECTS != null) this.settings.damageEffects = set.DAMAGE_EFFECTS;
-                    if (set.RATIO_EFFECTS != null) this.settings.ratioEffects = set.RATIO_EFFECTS;
-                    if (set.MOTION_EFFECTS != null) this.settings.motionEffects = set.MOTION_EFFECTS;
                     if (set.GIVE_KILL_MESSAGE != null) this.settings.givesKillMessage = set.GIVE_KILL_MESSAGE;
                     if (set.CAN_GO_OUTSIDE_ROOM != null) this.settings.canGoOutsideRoom = set.CAN_GO_OUTSIDE_ROOM;
                     if (set.HITS_OWN_TYPE != null) this.settings.hitsOwnType = set.HITS_OWN_TYPE;
@@ -6379,7 +6568,16 @@ const Chain = Chainf;
 					this.onDead = set.ON_DEAD || null
                     this.isObserver = set.IS_OBSERVER;
                     this.onOverride = set.ON_OVERRIDE;
-                    this.isSentry = set.IS_SENTRY || null
+                    this.isSentry = set.IS_SENTRY || null;
+					if(set.LEASHED){
+						if(typeof set.LEASHED === "number"){
+							this.controllers.push(new ioTypes.leashed(this, set.LEASHED));
+						}else{
+							console.error(`LEASHED must be a number`, this)
+						}
+					}else{
+						this.leash = null;
+					}
                     if (set.UPGRADES_TIER_1 != null)
                         for (let e of set.UPGRADES_TIER_1) this.upgrades.push({
                             class: exportNames[e.index],
@@ -6410,7 +6608,6 @@ const Chain = Chainf;
                         });
                     if (set.SIZE != null) {
                         this.SIZE = set.SIZE * this.squiggle;
-                        if (this.coreSize == null) this.coreSize = this.SIZE;
                     }
                     if (set.SKILL != null && set.SKILL.length > 0) {
                         if (set.SKILL.length !== 10) throw ("Invalid skill raws!");
@@ -6436,7 +6633,7 @@ const Chain = Chainf;
                     }
                     if (set.CAMERA_TO_MOUSE != null) {
                         this.scoped = true,
-                            this.scopedMult = set.CAMERA_TO_MOUSE[1] - 1
+                        this.scopedMult = set.CAMERA_TO_MOUSE[1] - 1
                     }
                     this.altCameraSource = null
                     if (set.GUNS != null) {
@@ -6447,11 +6644,6 @@ const Chain = Chainf;
                             i++;
                         }
                         this.guns = newGuns;
-                    }
-                    if (set.LASERS != null) {
-                        let newLasers = [];
-                        for (let def of set.LASERS) newLasers.push(new Laser(this, def));
-                        this.lasers = newLasers;
                     }
                     if (set.PROPS != null) {
                         let newProps = [];
@@ -6517,7 +6709,7 @@ const Chain = Chainf;
                         if (this.isArenaCloser) this.immuneToAbilities = true;
                     }
                     this.variables = set.VARIABLES ? JSON.parse(JSON.stringify(set.VARIABLES)) : {};
-                    this.animation = null
+					this.animations = [];
                     if (this.isShiny) {
                         this.color = -1
                         this.skill.score *= 3
@@ -6556,7 +6748,7 @@ const Chain = Chainf;
                 }
             }
             refreshBodyAttributes() {
-                let speedReduce = Math.pow(this.size / (this.coreSize || this.SIZE), 1);
+                let speedReduce = Math.pow(this.size / this.SIZE, 1);
                 this.acceleration = c.runSpeed * this.ACCELERATION / speedReduce;
                 if (this.settings.reloadToAcceleration) this.acceleration *= this.skill.acl;
                 this.topSpeed = c.runSpeed * this.SPEED * this.skill.mob / speedReduce;
@@ -6573,7 +6765,7 @@ const Chain = Chainf;
                 this.pushability = this.PUSHABILITY;
             }
             refreshFOV() {
-                this.fov = 250 * this.FOV * Math.sqrt(this.size) * (1 + .003 * this.skill.level);
+                this.fov = 250 * this.FOV * (this.size**.5) * (1 + .003 * this.skill.level);
             }
             bindToMaster(position, bond) {// size, x, y, angle (deg), turn range, layer
                 this.bond = bond;
@@ -6602,7 +6794,7 @@ const Chain = Chainf;
             }
             get size() {
                 //if (this.bond == null) return (this.coreSize || this.SIZE) * (1 + this.skill.level / 60);
-                if (this.bond == null) return (this.coreSize || this.SIZE) * (1 + (this.skill.level > c.SKILL_CAP ? c.SKILL_CAP : this.skill.level) / 60);
+                if (this.bond == null) return this.SIZE * (1 + (this.skill.level > c.SKILL_CAP ? c.SKILL_CAP : this.skill.level) / 60);
                 return this.bond.size * this.bound.size;
             }
             get mass() {
@@ -6627,8 +6819,6 @@ const Chain = Chainf;
                     y: this.y,
                     cx: this.altCameraSource?this.altCameraSource[0]:this.x,
                     cy: this.altCameraSource?this.altCameraSource[1]:this.y,
-                    vx: this.velocity.x,
-                    vy: this.velocity.y,
                     size: this.size,
                     rsize: this.realSize,
                     status: 1,
@@ -6636,6 +6826,7 @@ const Chain = Chainf;
                     shield: this.shield.display(),
                     facing: this.facing,
                     vfacing: this.vfacing,
+					leash: this.leash,
                     twiggle: this.facingType !== "toTarget" || (this.facingType === "lmg" && this.control.fire), //this.facingType === "looseWithMotion" || this.facingType === "smoothWithMotion" || this.facingType === "spinSlowly" || this.facingType === "spinSlowly2" || this.facingType === "spinSlowly3" || this.facingType === "spinSlowly4" || this.facingType === "altSpin" || this.facingType === "fastSpin" || this.facingType === "autospin" || this.facingType === "autospin2" || this.facingType === "reverseAutospin" || this.facingType === "bitFastSpin" || this.facingType === "hadron" || this.facingType === "locksFacing" && this.control.alt || this.facingType === "hatchet" || this.facingType === "altLocksFacing" || this.facingType === "lmg" && this.control.fire,
                     layer: this.type === "mazeWall" ? 7 : this.passive && this.LAYER !== -1 ? 1 : this.LAYER === -1 ? this.bond == null ? this.type === "wall" ? 11 : this.type === "food" ? 10 : this.type === "tank" ? 5 : this.type === "crasher" ? 8 : 0 : this.bound.layer : this.LAYER,
                     color: this.color,
@@ -6718,6 +6909,11 @@ const Chain = Chainf;
                             o.kill();
                         }
                     });
+					this.laserMap.forEach(laser => {
+			            if (laser.clearOnMasterUpgrade) {
+                        	laser.destroy();
+                        }
+					})
                     //for (let o of entities)
                     //    if (o.settings.clearOnMasterUpgrade && o.master.id === this.id && o.id !== this.id && o !== this) o.kill();
                     this.skill.update();
@@ -6774,6 +6970,11 @@ const Chain = Chainf;
                         o.kill();
                     }
                 });
+				this.laserMap.forEach(laser => {
+		            if (laser.clearOnMasterUpgrade) {
+                    	laser.destroy();
+                    }
+				})
                 if (this.stealthMode) {
                     this.settings.leaderboardable = this.settings.givesKillMessage = false;
                     this.alpha = this.ALPHA = 0;
@@ -7603,9 +7804,7 @@ const Chain = Chainf;
                     for (let i = 0; i < this.guns.length; i++) {
                         let gun = this.guns[i];
                         if (gun.shootOnDeath) {
-                            let gx = gun.offset * Math.cos(gun.direction + gun.angle + gun.body.facing) + (1.35 * gun.length - gun.width * gun.settings.size / 2) * Math.cos(gun.angle + this.facing),
-                                gy = gun.offset * Math.sin(gun.direction + gun.angle + gun.body.facing) + (1.35 * gun.length - gun.width * gun.settings.size / 2) * Math.sin(gun.angle + this.facing);
-                            gun.fire(gx, gy, this.skill);
+                            gun.fire(gun.body.skill);
                         }
                     }
                     // Explosions, phases and whatnot
@@ -7625,7 +7824,6 @@ const Chain = Chainf;
                     // Just in case one of the onDead events revives the tank from death (like dominators), don't run it
                     if (this.isDead()) {
                         let killers = [],
-                            killTools = [],
                             notJustFood = false,
                             name = this.master.name === "" ? this.master.type === "tank" ? "An unnamed player's " + this.label : this.master.type === "miniboss" ? "a visiting " + this.label : util.addArticle(this.label) : this.master.name + "'s " + this.label,
                             jackpot = Math.round(util.getJackpot(this.skill.score) / this.collisionArray.length);
@@ -7635,23 +7833,24 @@ const Chain = Chainf;
                             if (o.type === "wall" || o.type === "mazeWall") {
                                 continue;
                             }
-                            if (o.master.isDominator || o.master.isArenaCloser || o.master.label === "Base Protector") {
-                                if (!killers.includes(o.master)) {
-                                    killers.push(o.master);
+							let master = o.master?.master ?? o.master
+							if(!master) continue;
+                            if (master.isDominator || master.isArenaCloser || master.label === "Base Protector") {
+                                if (!killers.includes(master)) {
+                                    killers.push(master);
                                 }
                             }
-                            if (o.master.settings.acceptsScore) {
-                                if (o.master.type === "tank" || o.master.type === "miniboss") {
+                            if (master.settings.acceptsScore) {
+                                if (master.type === "tank" || master.type === "miniboss") {
                                     notJustFood = true;
                                 }
-                                o.master.skill.score += jackpot;
-                                if (!killers.includes(o.master)) {
-                                    killers.push(o.master);
+                                master.skill.score += jackpot;
+                                if (!killers.includes(master)) {
+                                    killers.push(master);
                                 }
                             } else if (o.settings.acceptsScore) {
                                 o.skill.score += jackpot;
                             }
-                            killTools.push(o);
                         }
                         // Now process that information
                         let killText = notJustFood ? "" : "You have been killed by ",
@@ -7822,6 +8021,11 @@ const Chain = Chainf;
                     child.source = child
                     if (!child.settings.persistsAfterDeath) {
                         child.destroy()
+                    }
+                };
+                for (let [key, laser] of this.laserMap) {
+                    if (!laser.persistsAfterDeath) {
+                        laser.destroy()
                     }
                 };
                 /*this.childrenMap.forEach(instance => {
@@ -8239,6 +8443,7 @@ function flatten(data, out, playerContext = null) {
         flags |= data.label ? 128 : 0;
         flags |= data.sizeRatio[0] !== 1 ? 256 : 0;
         flags |= data.sizeRatio[1] !== 1 ? 512 : 0;
+		flags |= data.leash ? 1024 : 0;
 
         // Push core data
         out.push(data.id, flags, data.index, x, y, size, facing);
@@ -8256,6 +8461,7 @@ function flatten(data, out, playerContext = null) {
         if (flags & 128) out.push(data.label);
         if (flags & 256) out.push(data.sizeRatio[0]);
         if (flags & 512) out.push(data.sizeRatio[1]);
+		if (flags & 1024) out.push(data.leash.x, data.leash.y)
 
         // Push player-specific data
         if (data.type & 0x04) {
@@ -8515,15 +8721,10 @@ function flatten(data, out, playerContext = null) {
                     clients.push(this);
                 }
                 animationsUpdate() {
-                    if (this.animationsToDo.size === 0) {
-                        return;
-                    }
-                    let packet = ["am", this.animationsToDo.size];
-                    this.animationsToDo.forEach((value, key) => {
-                        packet.push(key, value.length, ...value);
-                    });
-                    this.animationsToDo.clear();
-                    this.talk(...packet);
+					let arr = [];
+					this.animationsToDo.forEach((v)=>{arr.push(v.entityId, ...v)})
+					this.talk("am", ...arr);
+					this.animationsToDo.clear();
                 }
                 get readableID() {
                     return `Socket (${this.id}) [${this.name || "Unnamed Player"}]: `;
@@ -8627,8 +8828,8 @@ function flatten(data, out, playerContext = null) {
                     players = players.filter(player => player.id !== this.id);
                     clients = clients.filter(client => client.id !== this.id);
                     clearInterval(this.animationsInterval);
-                    		worker.postMessage({ type: "updatePlayers", players: clients.length, name: room.displayName, desc: room.displayDesc })
-                }
+					global.updateRoomInfo()
+				}
                 closeWithReason(reason) {
                     this.talk("P", reason);
                     this.kick(reason);
@@ -8859,7 +9060,7 @@ function flatten(data, out, playerContext = null) {
                             this.woomyOnlineSocketId = m[3];
                             util.info(trimName(name) + (isNew ? " joined" : " rejoined") + " the game! Player ID: " + (entitiesIdLog - 1) + ". IP: " + this.ip + ". Players: " + clients.length + ".");
 
-                    		worker.postMessage({ type: "updatePlayers", players: clients.length, name: room.displayName, desc: room.displayDesc })
+							global.updateRoomInfo()
                             /*if (this.spawnCount > 0 && this.name != undefined && trimName(name) !== this.name) {
                                 this.error("spawn", "Unknown protocol error!");
                                 return;
@@ -8872,6 +9073,14 @@ function flatten(data, out, playerContext = null) {
                                 this.close(true);
                                 return;
                             }
+
+							if(players.length > maxPlayersOverride){
+                                console.log("[INFO]", `WoomyOnlineSocketId (${this.woomyOnlineSocketId}) attempted to join while the room is full.`);
+                                this.talk("P", "This room is currently full. Please try again later.");
+                                this.talk("closeSocket")
+                                this.close(true);
+                                return;
+							}
 
                             if (this.spawnCount === 0) {
                                 sockets.broadcast(trimName(name) + " has joined the game! (" + players.length + " players)")
@@ -8925,7 +9134,9 @@ function flatten(data, out, playerContext = null) {
                                 this.error("Mockup Request", "Non-numeric value")
                                 return 1;
                             }
-                            this.talk("mu", m[0], JSON.stringify(mockups.getMockup(m[0])))
+							let mockup = mockups.getMockup(m[0])
+							if(typeof mockup !== "object") break;
+                            this.talk("mu", m[0], JSON.stringify(mockup))
                             break;
                         case "muEdit":
                             if (typeof m[0] !== "string") {
@@ -9791,6 +10002,7 @@ function flatten(data, out, playerContext = null) {
                             if (body?.onQ) body.onQ(body)
 
                             if (!isAlive || body.bossTierType === -1 || !body.canUseQ) return;
+							body.canUseQ = false;
                             setTimeout(() => body.canUseQ = true, 1000);
                             let labelMap = (new Map().set("MK-1", 1).set("MK-2", 2).set("MK-3", 3).set("MK-4", 4).set("MK-5", 0).set("TK-1", 1).set("TK-2", 2).set("TK-3", 3).set("TK-4", 4).set("TK-5", 0).set("PK-1", 1).set("PK-2", 2).set("PK-3", 3).set("PK-4", 0).set("EK-1", 1).set("EK-2", 2).set("EK-3", 3).set("EK-4", 4).set("EK-5", 5).set("EK-6", 0).set("HK-1", 1).set("HK-2", 2).set("HK-3", 3).set("HK-4", 0).set("HPK-1", 1).set("HPK-2", 2).set("HPK-3", 0).set("RK-1", 1).set("RK-2", 2).set("RK-3", 3).set("RK-4", 4).set("RK-5", 0).set("OBP-1", 1).set("OBP-2", 2).set("OBP-3", 0).set("AWP-1", 1).set("AWP-2", 2).set("AWP-3", 3).set("AWP-4", 4).set("AWP-5", 5).set("AWP-6", 6).set("AWP-7", 7).set("AWP-8", 8).set("AWP-9", 9).set("AWP-10", 0).set("Defender", 1).set("Custodian", 0).set("Switcheroo (Ba)", 1).set("Switcheroo (Tw)", 2).set("Switcheroo (Sn)", 3).set("Switcheroo (Ma)", 4).set("Switcheroo (Fl)", 5).set("Switcheroo (Di)", 6).set("Switcheroo (Po)", 7).set("Switcheroo (Pe)", 8).set("Switcheroo (Tr)", 9).set("Switcheroo (Pr)", 10).set("Switcheroo (Au)", 11).set("Switcheroo (Mi)", 12).set("Switcheroo (La)", 13).set("Switcheroo (A-B)", 14).set("Switcheroo (Si)", 15).set("Switcheroo (Hy)", 16).set("Switcheroo (Su)", 17).set("Switcheroo (Mg)", 0).set("CHK-1", 1).set("CHK-2", 2).set("CHK-3", 0).set("GK-1", 1).set("GK-2", 2).set("GK-3", 0).set("NK-1", 1).set("NK-2", 2).set("NK-3", 3).set("NK-4", 4).set("NK-5", 5).set("NK-5", 0).set("Dispositioner", 1).set("Reflector", 2).set("Triad", 0).set("SOULLESS-1", 1).set("Railtwin", 1).set("Synced Railtwin", 0).set("EQ-1", 1).set("EQ-2", 2).set("EQ-3", 3).set("EQ-4", 0).set("ES-1", 1).set("ES-2", 2).set("ES-3", 3).set("ES-4", 4).set("ES-5", 0).set("RS-1", 1).set("RS-2", 2).set("RS-3", 3).set("RS-4", 0));
                             if (labelMap.has(body.label) && body.bossTierType !== 16) body.tierCounter = labelMap.get(body.label);
@@ -10339,7 +10551,9 @@ function flatten(data, out, playerContext = null) {
         }
         const gameLoop = (() => {
             const collide = (() => {
-                if (c.NEW_COLLISIONS) {
+                // Currently unused
+				// Worth reviewing to determine if it should be used
+				/*if (c.NEW_COLLISIONS) {
                     function bounce(instance, other, doDamage, doMotion) {
                         let dist = Math.max(1, util.getDistance(instance, other));
                         if (dist > instance.realSize + other.realSize) {
@@ -10395,15 +10609,13 @@ function flatten(data, out, playerContext = null) {
                             if (!Number.isFinite(speedFactor.instance)) speedFactor.instance = 1;
                             if (!Number.isFinite(speedFactor.other)) speedFactor.other = 1;
                             let speedDmgMultiplier = speedToDamageFunction(Math.abs(getSpeed(instance) - getSpeed(other)))
-                            let resistDiff = instance.health.resist - other.health.resist,
-                                damage = {
+                            let resistDiff = instance.health.resist - other.health.resist;
+                            let damage = {
                                     instance: c.DAMAGE_CONSTANT * instance.damage * Math.max(minResistBuff, Math.min(maxResistBuff,(1 + resistDiff))) * (1 + other.heteroMultiplier * (instance.settings.damageClass === other.settings.damageClass)) * ((instance.settings.buffVsFood && other.settings.damageType === 1) ? 3 : 1) * instance.damageMultiplier() * Math.min(2, Math.max(speedFactor.instance, 1) * speedFactor.instance) * speedDmgMultiplier,
                                     other: c.DAMAGE_CONSTANT * other.damage * Math.max(minResistBuff, Math.min(maxResistBuff,(1 - resistDiff))) * (1 + instance.heteroMultiplier * (instance.settings.damageClass === other.settings.damageClass)) * ((other.settings.buffVsFood && instance.settings.damageType === 1) ? 3 : 1) * other.damageMultiplier() * Math.min(2, Math.max(speedFactor.other, 1) * speedFactor.other) * speedDmgMultiplier
                                 };
-                            if (instance.settings.ratioEffects) damage.instance *= Math.min(1, Math.pow(Math.max(instance.health.ratio, instance.shield.ratio), 1 / instance.penetration));
-                            if (other.settings.ratioEffects) damage.other *= Math.min(1, Math.pow(Math.max(other.health.ratio, other.shield.ratio), 1 / other.penetration));
-                            if (instance.settings.damageEffects) damage.instance *= (1 + (componentNorm - 1) * (1 - depth.other) / instance.penetration) * (1 + pen.other.sqrt * depth.other - depth.other) / pen.other.sqrt;
-                            if (other.settings.damageEffects) damage.other *= (1 + (componentNorm - 1) * (1 - depth.instance) / other.penetration) * (1 + pen.instance.sqrt * depth.instance - depth.instance) / pen.instance.sqrt;
+                            damage.instance *= (1 + (componentNorm - 1) * (1 - depth.other) / instance.penetration) * (1 + pen.other.sqrt * depth.other - depth.other) / pen.other.sqrt;
+                            damage.other *= (1 + (componentNorm - 1) * (1 - depth.instance) / other.penetration) * (1 + pen.instance.sqrt * depth.instance - depth.instance) / pen.instance.sqrt;
                             if (!Number.isFinite(damage.instance)) damage.instance = 1;
                             if (!Number.isFinite(damage.other)) damage.other = 1;
                             let damageToApply = {
@@ -10442,7 +10654,7 @@ function flatten(data, out, playerContext = null) {
                             doMotion = true;
                         bounce(instance, other, doDamage, doMotion);
                     }
-                }
+                }*/
                 // Collision Functions
                 function simpleCollide(my, n) {
                     let diff = (1 + util.getDistance(my, n) / 2) * room.speed;
@@ -10702,10 +10914,8 @@ function flatten(data, out, playerContext = null) {
                                     damage._n *= Math.min(2, Math.max(speedFactor._n, 1) * speedFactor._n);
                                 }
 
-                                if (my.settings.ratioEffects) damage._me *= Math.min(1, Math.pow(Math.max(my.health.ratio, my.shield.ratio), 1 / my.penetration));
-                                if (n.settings.ratioEffects) damage._n *= Math.min(1, Math.pow(Math.max(n.health.ratio, n.shield.ratio), 1 / n.penetration));
-                                if (my.settings.damageEffects) damage._me *= (1 + (componentNorm - 1) * (1 - depth._n) / my.penetration) * (1 + pen._n.sqrt * depth._n - depth._n) / pen._n.sqrt;
-                                if (n.settings.damageEffects) damage._n *= (1 + (componentNorm - 1) * (1 - depth._me) / n.penetration) * (1 + pen._me.sqrt * depth._me - depth._me) / pen._me.sqrt;
+                                damage._me *= (1 + (componentNorm - 1) * (1 - depth._n) / my.penetration) * (1 + pen._n.sqrt * depth._n - depth._n) / pen._n.sqrt;
+                            	damage._n *= (1 + (componentNorm - 1) * (1 - depth._me) / n.penetration) * (1 + pen._me.sqrt * depth._me - depth._me) / pen._me.sqrt;
                                 let damageToApply = {
                                     _me: damage._me,
                                     _n: damage._n
@@ -10772,8 +10982,7 @@ function flatten(data, out, playerContext = null) {
                                 n.accel.y += nIsFirmCollide * (component * dir.y + combinedDepth.up);
                             } else {
                                 let elasticity = 2 - 4 * Math.atan(my.penetration * n.penetration) / Math.PI;
-                                if (doInelastic && my.settings.motionEffects && n.settings.motionEffects) elasticity *= savedHealthRatio._me / pen._me.sqrt + savedHealthRatio._n / pen._n.sqrt;
-                                else elasticity *= 2;
+                                elasticity *= 2;
                                 let spring = 2 * Math.sqrt(savedHealthRatio._me * savedHealthRatio._n) / room.speed,
                                     elasticImpulse = Math.pow(combinedDepth.down, 2) * elasticity * component * my.mass * n.mass / (my.mass + n.mass),
                                     springImpulse = c.KNOCKBACK_CONSTANT * spring * combinedDepth.up,
@@ -11218,7 +11427,7 @@ function flatten(data, out, playerContext = null) {
                         // Player collision
                         case (!isSameTeam && !instance.hitsOwnTeam && !other.hitsOwnTeam):
                         case (isSameTeam && (instance.hitsOwnTeam || other.hitsOwnTeam) && instance.master.source.id !== other.master.source.id): {
-                            advancedCollide(instance, other, true, true);
+                            advancedCollide(instance, other, true, false);
                         } break;
                         // Never collide
                         case (instance.settings.hitsOwnType === "never" || other.settings.hitsOwnType === "never"): { } break;
@@ -11318,27 +11527,30 @@ function flatten(data, out, playerContext = null) {
                     });
                 }
 
-                grid.clear();
+				for(let entity of entities) {
+				    if (!entity.isActive) return true;
+                    entitiesLiveLoop(entity)
+                    entity.collisionArray.length = 0;
+                }
+
+				grid.clear();
                 entities.filterToChain(entity => {
+					entity.deactivation();
+				    if (!entity.isActive) return true;
+				
                     if (entity.isGhost === true) return false;
                     if (entity.neverInGrid === true) return true;
                     entity._AABB = grid.getAABB(entity);
                     grid.insert(entity);
-
-                    if (!entity.isActive) return true;
-                    grid.getCollisions(entity, (other) => {
-                        collide(entity, other);
+                	grid.getCollisions(entity, (other) => {
+                    	collide(entity, other);
                     });
-                    return true;
+					return true;
                 });
 
-                entities.forEach(entity => {
-                    entity.deactivation();
-                    if (entity.isActive) {
-                        entitiesLiveLoop(entity)
-                        entity.collisionArray.length = 0;
-                    }
-                })
+				lasers.forEach((laser)=>{
+					laser.tick();
+				})
 
                 room.wallCollisions = []
 
@@ -12321,10 +12533,10 @@ function flatten(data, out, playerContext = null) {
                                             button.totalDamage += amount
                                         }
                                         button.onTick = function () {
-                                            if (Date.now() - button.lastHitTime > 1000) {
+                                            if (Date.now() - button.lastHitTime > 50) {
                                                 button.lastHitTime = Date.now()
 
-                                                if (button.averageDps.length > 6) {
+                                                if (button.averageDps.length > 30) {
                                                     button.averageDps.shift()
                                                 }
                                                 button.averageDps.push(button.totalDamage)
@@ -12368,7 +12580,7 @@ function flatten(data, out, playerContext = null) {
                                         button.color = status ? 11 : 12
                                         button.name = status ? "Bots enabled" : "Bots disabled"
                                         if (status) {
-                                            room.botCap = 5
+                                            room.botCap = 1
                                         } else {
                                             room.botCap = 0
                                         }
@@ -12688,8 +12900,6 @@ function flatten(data, out, playerContext = null) {
                 if (body != null && body.isAlive()) { // We are alive
                     camera.x = body.altCameraSource?body.altCameraSource[0]:photo.cx;
                     camera.y = body.altCameraSource?body.altCameraSource[1]:photo.cy;
-                    camera.vx = photo.vx;
-                    camera.vy = photo.vy;
                     fov = body.fov;
                 }else{ // We are dead/spectating
 					if(body.spectating){
@@ -12703,8 +12913,6 @@ function flatten(data, out, playerContext = null) {
 							const spectatePhoto = body.spectating.camera()
 							camera.x = spectatePhoto.x;
 							camera.y = spectatePhoto.y;
-							camera.vx = spectatePhoto.vx;
-							camera.vy = spectatePhoto.vy;
 							fov = body.spectating.fov;
 						}
 					}
@@ -12738,9 +12946,13 @@ function flatten(data, out, playerContext = null) {
 					entity.deactivationTimer = 30;
 					entity.isActive = true;
                     
-                    if (entity.animation) {
-                        socket.animationsToDo.set(entity.id, entity.animation);
-                    }
+					for(let animation of entity.animations){
+						if(animation.active && socket.animationsToDo.has(`${entity.id}-${animation.index}`) === false){
+							const arr = animation.toArray();
+							arr.entityId = entity.id
+							socket.animationsToDo.set(`${entity.id}-${animation.index}`, arr)
+						}
+					}
 
 					// Apply necessary checks from the original logic:
                     if (
@@ -12806,6 +13018,9 @@ function flatten(data, out, playerContext = null) {
                     //player.body = null; // Dereference the dead body
                 }
 
+				const laserPacket = [];
+				lasers.forEach((l)=>l.addToPacket(laserPacket, playerContext))
+
 
                 // Send the update packet to the client
                 socket.talk(
@@ -12817,6 +13032,8 @@ function flatten(data, out, playerContext = null) {
                     fov + .5 | 0, // FOV (rounded)
                     // camera.vx, camera.vy, // Omitted velocity as per original packet format change
                     (player.gui ? player.gui() : []), // Player GUI data (assuming player.gui() is defined elsewhere and returns an array)
+					lasers.size,
+					laserPacket,
                     numberInView, // Count of visible entities
                     visible.flat() // Flattened data for visible entities
                 );
@@ -12851,7 +13068,7 @@ function flatten(data, out, playerContext = null) {
         }, 1000);*/
 
         if (room.maxBots > 0) setTimeout(() => util.log(`Spawned ${room.maxBots} AI bot${room.maxBots > 1 ? "s." : "."}`), 350);
-        worker.postMessage({ type: "updatePlayers", players: clients.length, name: room.displayName, desc: room.displayDesc })
+		global.updateRoomInfo()
         worker.postMessage({ type: "serverStarted" })
     })();
 }

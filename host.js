@@ -11,6 +11,7 @@ import * as wsLib from "ws"
 //
 // PEER
 //
+global.location = {protocol: "https"}
 const iceServers = [
 	{ urls: 'stun:stun.l.google.com:19302' },
 	{ urls: 'stun:stun1.l.google.com:19302' },
@@ -20,7 +21,7 @@ const iceServers = [
 ];
 iceServers.fetchTurnCredentials = async function() {
   try {
-    const response = await fetch('http://woomy.online/api/get-turn-credentials');
+    const response = await fetch('https://woomy.online/api/get-turn-credentials');
     if (!response.ok) {
       throw new Error(`Failed to fetch TURN credentials: ${response.statusText}`);
     }
@@ -40,9 +41,15 @@ class PeerWrapper {
 	constructor(iceServersParam) {
 		const servers = iceServers.concat(iceServersParam)
 		console.log(servers)
-		this.peer = new Peer({config:{
-			iceServers: servers
-		}});
+		this.peer = new Peer({
+            host: "signaling.woomy.online",
+			path: "/peerjs",
+			port: "443",
+			secure : true,
+			config:{
+				iceServers: servers
+			}
+		});
 		this.conn = null;
 		this.id = null;
 		this.onmessage = undefined;
@@ -54,7 +61,7 @@ class PeerWrapper {
 				resolve();
 			});
 			this.peer.on('error', (err)=>{
-				console.log("Error initlaizing peer")
+				console.log("Error initlaizing peer", err)
 				reject(err)
 			});
 		});
@@ -122,8 +129,8 @@ let roomWs = undefined;
 const roomPeers = new Map();
 let hostRoomId = undefined;
 
-async function wrmHost() {
-	roomWs = new wsLib.WebSocket(`wss://woomy.online/host`)
+async function wrmHost(settings={}) {
+	roomWs = new wsLib.WebSocket(settings.localRM===true?"ws://localhost/host":`wss://woomy.online/host`)
 	let openPromise = new Promise((res, rej) => {
 		roomWs.onopen = () => {
 			console.log("Room socket opened with room manager")
@@ -174,7 +181,7 @@ async function wrmHost() {
 		console.log("Room socket closed with room manager. Retrying in 5 seconds.")
 		setTimeout(async ()=>{
 			console.log("Retrying WRM connection...")
-			await wrmHost().catch((e)=>console.error("Failed to restart", e));
+			await wrmHost(settings).catch((e)=>console.error("Failed to restart", e));
 			hostRoomId = await getHostRoomId();
 		}, 5000)
 	}
@@ -198,13 +205,15 @@ async function getHostRoomId(){
 // WORKER/SERVER
 //
 const worker = new Worker('./server/server.js');
-worker.start = async function (gamemodeCode, displayNameOverride, displayDescOverride) {
+worker.start = async function (gamemodeCode, displayNameOverride, displayDescOverride, maxPlayers, botAmount, settings) {
 	worker.postMessage({
 		type: "startServer",
 		server: {
 			suffix: gamemodeCode,
 			displayName: displayNameOverride,
-			displayDesc: displayDescOverride
+			displayDesc: displayDescOverride,
+			maxPlayers: maxPlayers,
+			maxBots: botAmount
 		}
 	});
 	let startPromise = new Promise((res, rej) => {
