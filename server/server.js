@@ -4382,7 +4382,7 @@ const Chain = Chainf;
 				if (damageRef.collisionArray.length && currentHealth < this.oldHealth) {
 					this.oldHealth = currentHealth;
 					const collider = damageRef.collisionArray[0];
-					this.targetLock = (collider.master.id === -1) ? collider.source : collider.master;
+					this.targetLock = (collider.master) ? (collider.master.id === -1) ? collider.source : collider.master : null;
 				}
 
 				// Throttle expensive target acquisition.
