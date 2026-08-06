@@ -4,7 +4,7 @@ import { worker, wrmHost, getHostRoomId } from "./host.js";
     console.log("# STARTING WRM CONNECTION")
     await wrmHost({
         localRM: false, // Set to true if you're hosting your own room manager
-        RMPort: 80, // 443 for non-local RM. 3000 is the default for local RM
+        RMPort: 443, // 443 for non-local RM. 3000 is the default for local RM
     }).catch((err) => console.error("Failed to start RM connection", err))
 
     console.log("# STARTING WORKER")
