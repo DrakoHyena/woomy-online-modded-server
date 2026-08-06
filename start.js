@@ -9,7 +9,7 @@ import { worker, wrmHost, getHostRoomId } from "./host.js";
 
     console.log("# STARTING WORKER")
     await worker.start(
-        "ffa.json", // gamemode (see configs folder for other gamemodes)
+        "warfront.js", // gamemode (see configs folder for other gamemodes)
         "[WOMS] Warfront", // room name
         "The default gamemode for the Woomy Online Modded Server\nhttps://github.com/DrakoHyena/woomy-online-modded-server\n(To change this, edit start.js)", // room description
         99, // max players (note, player limit will intentionally be hidden if it's 99)
