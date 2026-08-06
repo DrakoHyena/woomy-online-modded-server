@@ -1,20 +1,21 @@
 import { worker, wrmHost, getHostRoomId } from "./host.js";
 
-(async ()=>{
-	console.log("# STARTING WRM CONNECTION")
-	await wrmHost({
-		// TODO: didnt work in testing, if you can make it work, submit a pull request while youre at it, you'll need to edit host.js
-		//localRM: true, // Uncomment if you're hosting your own room manager
-	})
+(async () => {
+    console.log("# STARTING WRM CONNECTION")
+    await wrmHost({
+        localRM: true, // Set to true if you're hosting your own room manager
+        RMPort: 3000, // 443 for non-local RM. 3000 is the default for local RM
+    }).catch((err) => console.error("Failed to start RM connection", err))
 
-	console.log("# STARTING WORKER")
-	await worker.start(
-		"growth.json", // gamemode (see configs folder for other gamemodes)
-		"[WOMS] Growth", // room name
-		"The default gamemode for the Woomy Online Modded Server\nhttps://github.com/DrakoHyena/woomy-online-modded-server\n(To change this, edit start.js)", // room description
-		99, // max players (note, player limit will intentionally be hidden if it's 99)
-		20, // default bot amount
-	)
-	
-	console.log("🚀 Up and running with room id: "+await getHostRoomId())
+    console.log("# STARTING WORKER")
+    await worker.start(
+        "ffa.json", // gamemode (see configs folder for other gamemodes)
+        "[WOMS] Warfront", // room name
+        "The default gamemode for the Woomy Online Modded Server\nhttps://github.com/DrakoHyena/woomy-online-modded-server\n(To change this, edit start.js)", // room description
+        99, // max players (note, player limit will intentionally be hidden if it's 99)
+        20, // default bot amount
+        "roomhost", // default host powers token
+    )
+
+    console.log("🚀 Up and running with room id: " + await getHostRoomId())
 })()

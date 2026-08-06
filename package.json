@@ -6,13 +6,18 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node ./start.js"
   },
-  "author": "",
+  "author": "Drako Hyena",
   "license": "ISC",
   "description": "",
   "type": "module",
   "dependencies": {
-    "node-pre-gyp": "^0.17.0",
     "peerjs-on-node": "^1.0.2",
     "ws": "^8.18.3"
+  },
+  "overrides": {
+    "tar": "^7.4.3"
+  },
+  "allowScripts": {
+    "wrtc": true
   }
 }
