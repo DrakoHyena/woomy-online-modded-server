@@ -3,8 +3,8 @@ import { worker, wrmHost, getHostRoomId } from "./host.js";
 (async () => {
     console.log("# STARTING WRM CONNECTION")
     await wrmHost({
-        RMUrl: "localhost", // woomy.online for non-local RM | localhost for local RM 
-        RMPort: 3000, // 443 for non-local RM | 3000 is the default for local RM
+        RMUrl: "woomy.online", // woomy.online for non-local RM | localhost for local RM 
+        RMPort: 443, // 443 for non-local RM | 3000 is the default for local RM
     }).catch((err) => console.error("Failed to start RM connection", err))
 
     console.log("# STARTING WORKER")
