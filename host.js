@@ -42,8 +42,8 @@ class PeerWrapper {
         const servers = iceServers.concat(iceServersParam)
         console.log(servers)
         this.peer = new Peer({
-            host: hostSettings.localRM === true ? "0.peerjs.com" : "signaling.woomy.online",
-            path: hostSettings.localRM === true ? "/" : "/peerjs",
+            host: hostSettings.RMUrl === "woomy.online" ? "signaling.woomy.online" : "0.peerjs.com",
+            path: hostSettings.RMUrl === "woomy.online" ? "/peerjs" : "/",
             port: "443",
             secure: true,
             config: {
@@ -130,7 +130,7 @@ const roomPeers = new Map();
 let hostRoomId = undefined;
 
 async function wrmHost(settings = {}) {
-    roomWs = new wsLib.WebSocket(settings.localRM === true ? `ws://localhost:${settings.RMPort}/host` : `wss://woomy.online:${settings.RMPort}/host`)
+    roomWs = new wsLib.WebSocket(`${settings.RMPort === 443 ? "wss" : "ws"}://${settings.RMUrl}:${settings.RMPort}/host`)
     let openPromise = new Promise((res, rej) => {
         roomWs.onopen = () => {
             console.log("Room socket opened with room manager")
