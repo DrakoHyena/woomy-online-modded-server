@@ -30,7 +30,7 @@ const g = {
     // Reload, recoil, shudder, size, health, damage, penetration, speed, max speed, range, density, spray, resist
     "blank": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     "basic": [20, 1.4, 0.1, 1, 1.775, 0.197, 1, 5, 1.5, 1, 1, 15, 1],
-    "trap": [33, 1, 0.25, 0.9, 8, 0.08, .8, 3, 2, 2.35, 2, 12.5, 1.15],
+    "trap": [31.5, 1, 0.25, 0.9, 8, 0.08, .8, 3, 2, 2.35, 2.15, 12.5, 1.15],
     "swarm": [27, 0.25, 0.05, 0.4, 0.9, 0.235, 0.85, 3.5, 1, 1, 0.8, 5, 1.25],
     "swarmlet": [36, 0.25, 0.05, 0.4, 1.2, 0.2, 1, 3.5, 1, 1, 1.25, 5, 1.25],
     "drone": [60, 0.25, 0.1, 0.6, 4.334, 0.5, 1.5, 2.334, 1, 1, 1, 0.1, 1.1],
@@ -519,7 +519,8 @@ const statNames = {
     lancer: 12,
     flail: 13,
     inject: 14,
-    laser: 15
+    laser: 15,
+    bulletless: 16
 };
 const gunCalcNames = {
     default: 0,
@@ -76387,7 +76388,7 @@ defExports.growingRoadblock = {
         PROPERTIES: {
             SHOOT_SETTINGS: combineStats([g.trap, g.mach, g.chain, g.volley]),
             TYPE: [defExports.trap, {
-                MOTION_TYPE: 'miniGrower',
+                MOTION_TYPE: 'microGrower',
                 HITS_OWN_TYPE: 'hard'
             }],
             STAT_CALCULATOR: gunCalcNames.trap
@@ -113032,6 +113033,7 @@ defExports.rummy = {
 defExports.bentBoomer4 = makeAutoN(defExports.bentBoomer, 4);
 defExports.heliPropA = {
     CONTROLLERS: ['reverseHeliSpin'],
+    INDEPENDENT: true,
     GUNS: [{
         POSITION: [66, 9, 1, 0, 0, 0, 0]
     }, {
@@ -116211,7 +116213,7 @@ defExports.text = {
     NAME: "If youre seeing this someone forgot to replace the name of a text entity.. let a dev know",
     SHAPE: 10020,
     SIZE: 15,
-    HITS_OWN_TEAM: "never",
+    HITS_OWN_TEAM: false,
     HITS_OWN_TYPE: "never",
     DIES_TO_TEAM_BASE: false,
     GO_THRU_OBSTACLES: true,
@@ -149068,39 +149070,7 @@ neoMakeAnimTank("sgtPepper", "Sgt. Pepper", [{
 }, {
     tank: defExports.mini2
 }]);
-defExports.apache = makeAuto({
-    PARENT: [defExports.genericTank],
-    DANGER: 7,
-    BODY: {
-        ACCELERATION: base.ACCEL * .5,
-        SPEED: base.SPEED * .65,
-        FOV: 1.4
-    },
-    LAYER: 13,
-    MOTION_TYPE: 'glideBall',
-    IS_HELICOPTER: true,
-    HAS_NO_RECOIL: true,
-    GUNS: [{
-        POSITION: [32, 8.5, 1, 0, 0, 0, 0],
-        PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.basic, g.sniper, g.assassin, g.ranger]),
-            TYPE: defExports.bullet
-        }
-    }, {
-        POSITION: [5, 8.5, -1.6, 8, 0, 0, 0]
-    }, {
-        POSITION: [18, 4.8, 1, 0, -6.923, 195, 0]
-    }, {
-        POSITION: [18, 4.8, 1, 0, 6.923, 165, 0]
-    }],
-    TURRETS: [{
-        POSITION: [8, -19, 0, 0, 361, 1],
-        TYPE: defExports.heliPropB
-    }]
-}, 'Rescue Helicopter', {
-    type: defExports.heliPropA,
-    independent: true
-});
+
 defExports.sixShot = {
     PARENT: [defExports.genericTank],
     LABEL: 'Six-Shot',
@@ -190554,108 +190524,152 @@ defExports.warfrontLine = {
     CAN_BE_ON_LEADERBOARD: false,
     DANGER: 0,
 };
-defExports.laserTest1 = {
-    PARENT: [defExports.genericTank],
-    LABEL: 'Laser Test 1',
-    DANGER: 10,
-    STAT_NAMES: statNames.laser,
-    GUNS: [{
-        POSITION: [30, 20, 1, 0, 0, 0, 0],
-        PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.basic, g.less_reload, g.less_reload, g.less_reload, g.less_reload, g.less_reload, g.less_reload, g.less_reload, g.less_reload, g.less_reload]),
-            TYPE: [defExports.laser, {
-                RANGE: 50,
-                DURATION: 2,
-                PIERCE: 10000,
-                DAMAGE: .8,
-            }],
-            SKIN: 19
-        }
-    }]
-};
-defExports.laserTest2Gun1 = {
-    LABEL: "Laser Test 2 Gun 1",
+
+defExports.attachmentPoint = {
+    PARENT: [defExports.genericEntity],
+    LABEL: "Attachment Point",
+    GODMODE: true,
+    PASSIVE: true,
+    SHAPE: 10020,
+    SIZE: 15,
+    HITS_OWN_TEAM: true,
+    GO_THRU_OBSTACLES: true,
+    CAN_GO_OUTSIDE_ROOM: true,
+    CAN_BE_ON_LEADERBOARD: false,
+    GIVE_KILL_MESSAGE: false,
+    DRAW_HEALTH: false,
+    DANGER: 0,
+    LAYER: 0,
     BODY: {
-        FOV: 1
+        DAMAGE: 0,
+        PENETRATION: 100,
+        PUSHABILITY: 0,
+        DENSITY: 1e5
     },
-    COLOR: 16,
-    GUNS: [{
-        POSITION: [23, 10, 1, 10, 0, 0, 1],
-        PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.basic, g.mecha, g.less_reload, g.less_reload, g.less_reload, g.less_reload, g.less_reload]),
-            TYPE: [defExports.laser, {
-                RANGE: 20,
-                DURATION: 1,
-                PIERCE: 1,
-                DAMAGE: .09,
-            }],
-            SKIN: 19
-        }
-    }, {
-        POSITION: [13, 10, 1, 5, 0, 0, 0]
-    }]
 }
-defExports.laserTest2Gun2 = {
-    LABEL: "Laser Test 2 Gun 2",
-    BODY: {
-        FOV: 1
-    },
-    COLOR: 16,
-    GUNS: [{
-        POSITION: [8, 4, 1, 18, 2, 0, 2 / 3],
-        PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.basic, g.mecha, g.mini, g.laser, g.double_reload, g.less_damage, g.bigger]),
-            TYPE: defExports.line
-        }
-    }, {
-        POSITION: [10, 1, 1, 18, 2, 0, 0],
-        PROPERTIES: {
-            COLOR: 12
-        }
-    }, {
-        POSITION: [8, 4, 1, 18, -2, 0, 1 / 3],
-        PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.basic, g.mecha, g.mini, g.laser, g.double_reload, g.less_damage, g.bigger]),
-            TYPE: defExports.line
-        }
-    }, {
-        POSITION: [10, 1, 1, 18, -2, 0, 0],
-        PROPERTIES: {
-            COLOR: 12
-        }
-    }, {
-        POSITION: [9.5, 4, 1, 18, 0, 0, 0],
-        PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.basic, g.mecha, g.mini, g.laser, g.double_reload, g.less_damage, g.bigger]),
-            TYPE: defExports.line
-        }
-    }, {
-        POSITION: [11.5, 1, 1, 18, 0, 0, 0],
-        PROPERTIES: {
-            COLOR: 12
-        }
-    }, {
-        POSITION: [13, 10, 1, 5, 0, 0, 0]
-    }]
-}
-defExports.laserTest2 = {
+defExports.chinook = {
     PARENT: [defExports.genericTank],
-    LABEL: 'Laser Test 2',
+    LABEL: "Chinook",
+    TOOLTIP: "Alt fire and bump into a teammate to pick them up! Doing so again will drop them!",
     DANGER: 7,
-    STAT_NAMES: statNames.laser,
+    LAYER: 13,
+    MOTION_TYPE: 'glideBall',
+    HITS_OWN_TYPE: "teamNever",
     HAS_NO_RECOIL: true,
+    IS_HELICOPTER: true,
+    STAT_NAMES: statNames.bulletless,
+    SKILL_CAP: [0, 0, 0, 0, 0, 9, 9, 9, 9, 9],
     BODY: {
-        ACCELARATION: base.ACCEL * .75,
-        FOV: 1.1
+        FOV: 1.45,
+        SPEED: base.SPEED * .8
     },
     TURRETS: [{
-        POSITION: [15, 0, 12, 0, 90, 0],
-        TYPE: defExports.laserTest2Gun1
+        POSITION: [8, -44, 0, 0, 360, 1],
+        TYPE: defExports.heliPropB
     }, {
-        POSITION: [15, 0, -12, 0, 90, 0],
-        TYPE: defExports.laserTest2Gun2
-    }]
-};
+        POSITION: [10, -17, 17, 45, 360, 1],
+        TYPE: defExports.heliPropA,
+    }, {
+        POSITION: [15, -25, 0, 0, 360, 1],
+        TYPE: defExports.attachmentPoint
+    }, {
+        POSITION: [10, 0, 0, 0, 360, 1],
+        TYPE: defExports.heliPropA
+    }],
+    GUNS: [{
+        POSITION: [25, 3, 1, -25, -8.9, 0, 0]
+    }, {
+        POSITION: [25, 3, 1, -25, 8.9, 0, 0]
+    }, {
+        POSITION: [19, 4, 1, 19, -16.5, 200, 0]
+    }, {
+        POSITION: [19, 4, 1, 19, 16.5, -200, 0]
+    }, {
+        POSITION: [3, 22, 1, -25, 0, 0, 0]
+    }],
+    VARIABLES: {
+        attachedTank: false,
+        ogMotionType: undefined,
+        ogHitsOwnType: undefined,
+        pickupMode: false,
+        lastPickup: Date.now(),
+        altDebounce: Date.now()
+    },
+    ON_DEAD: ({ me }) => {
+        if (me.variables.attachedTank) {
+            me.variables.attachedTank.bond = undefined;
+            me.variables.attachedTank.bound = undefined;
+            me.variables.attachedTank.motionType = me.variables.ogMotionType;
+            me.variables.attachedTank.settings.hitsOwnType = me.variables.ogHitsOwnType;
+            me.settings.goThruObstacle = false;
+            me.variables.attachedTank.move();
+            me.variables.attachedTank = false;
+            me.variables.lastPickup = Date.now();
+            me.sendMessage("Teammate ejected!");
+        }
+    },
+    ON_TICK: (me) => {
+        if (me.variables.attachedTank) {
+            if (me.variables.attachedTank.isDead()) {
+                me.variables.attachedTank = false;
+                me.sendMessage("Teammate dead...");
+
+            } else if (me.variables.attachedTank.motionType !== "bound") {
+                me.variables.attachedTank.bond = undefined;
+                me.variables.attachedTank.bound = undefined;
+                me.variables.attachedTank.motionType = me.variables.ogMotionType;
+                me.variables.attachedTank.settings.hitsOwnType = me.variables.ogHitsOwnType;
+                me.variables.attachedTank.settings.goThruObstacle = false;
+                me.variables.attachedTank.move();
+                me.variables.attachedTank = false;
+                me.variables.lastPickup = Date.now();
+                me.sendMessage("Teammate ejected!");
+            }
+        }
+    },
+    ON_ALT: (me) => {
+        if (Date.now() - me.variables.altDebounce < 250) return;
+        me.variables.altDebounce = Date.now();
+
+        if (me.variables.attachedTank !== false) {
+            me.variables.attachedTank.master = me.variables.attachedTank;
+            me.variables.attachedTank.bond = undefined;
+            me.variables.attachedTank.bound = undefined;
+            me.variables.attachedTank.motionType = me.variables.ogMotionType;
+            me.variables.attachedTank.settings.hitsOwnType = me.variables.ogHitsOwnType;
+            me.variables.attachedTank.settings.goThruObstacle = false;
+            me.variables.attachedTank.move();
+            me.variables.attachedTank = false;
+            me.variables.lastPickup = Date.now();
+            me.sendMessage("Teammate dropped!");
+
+        } else if (me.variables.pickupMode === false && Date.now() - me.variables.lastPickup > 3000) {
+            me.variables.pickupMode = true;
+            me.sendMessage("Bump into a teammate to pick them up!");
+            me.variables.lastPickup = Date.now()
+
+        } else {
+            me.variables.pickupMode = false;
+            me.sendMessage(`You can pick up a new tank in ${((3000 - (Date.now() - me.variables.lastPickup)) / 1000).toFixed(2)}s`)
+
+        }
+    },
+    ON_COLLIDE: (me, them) => {
+        if (me.variables.pickupMode !== true || them.type !== "tank" || them.team !== me.team) return;
+        me.variables.lastPickup = Date.now();
+        me.sendMessage("Teammate picked up!");
+        me.variables.pickupMode = false;
+        me.variables.attachedTank = them;
+        me.variables.attachedTank.bond = me;
+        me.variables.attachedTank.bound = me.turrets[2].bound;
+        me.variables.ogMotionType = me.variables.attachedTank.motionType;
+        me.variables.attachedTank.motionType = "bound";
+        me.variables.ogHitsOwnType = me.variables.attachedTank.settings.hitsOwnType;
+        me.variables.attachedTank.settings.hitsOwnType = "teamNever";
+        me.variables.attachedTank.settings.goThruObstacle = true;
+        me.variables.attachedTank.move();
+    },
+}
 defExports.laserTest3Gun = {
     LABEL: "Laser Test 3 Gun",
     BODY: {
@@ -190699,85 +190713,7 @@ for (let i = 6, unit = 360 / i; i > 0; i--) {
         TYPE: defExports.laserTest3Gun
     })
 }
-defExports.laserTest4MinionGun = {
-    LABEL: "Laser Test 4 Minion Gun",
-    BODY: {
-        FOV: 3
-    },
-    AI: {
-        IGNORE_SHAPES: false,
-        SKYNET: true
-    },
-    ACCEPTS_SCORE: false,
-    CONTROLLERS: ['nearestDifferentMaster'],
-    INDEPENDENT: true,
-    COLOR: 16,
-    GUNS: [{
-        POSITION: [25, 10, 1, 10, 0, 0, 3],
-        PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.basic, g.more_reload, g.no_spread]),
-            TYPE: [defExports.laser, {
-                RANGE: 18,
-                DURATION: .5,
-                PIERCE: 1,
-                DAMAGE: .085,
-            }],
-            SKIN: 19
-        }
-    }, {
-        POSITION: [13, 10, 1, 5, 0, 0, 0]
-    }]
-}
-defExports.laserTest4Minion = {
-    PARENT: [defExports.minion],
-    LABEL: 'Laser Test 4 Minion',
-    SHAPE: 4,
-    DANGER: 9,
-    AI: {
-    },
-    INDEPENDENT: true,
-    GUNS: [],
-    ACCEPTS_SCORE: false,
-    TURRETS: [{
-        POSITION: [9, 8, 0, -45, 145, 0],
-        TYPE: defExports.laserTest4MinionGun
-    }, {
-        POSITION: [9, 8, 0, 45, 145, 0],
-        TYPE: defExports.laserTest4MinionGun
-    }]
-};
-defExports.laserTest4 = { // Crypto Miner
-    PARENT: [defExports.genericTank],
-    LABEL: 'Laser Test 4',
-    SHAPE: 8,
-    DANGER: 7,
-    STAT_NAMES: statNames.minion,
-    BODY: {
-        SPEED: base.SPEED * .8,
-        FOV: 1.1
-    },
-    GUNS: [{
-        POSITION: [18, 8, 1, 0, 0, 0, 0],
-        PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.basic, g.flank]),
-            TYPE: defExports.bullet
-        }
-    }, {
-        POSITION: [5, 16.5, 1, 10.5, 0, 180, 0]
-    }, {
-        POSITION: [2, 19.5, 1.01, 15.5, 0, 180, 0],
-        PROPERTIES: {
-            SHOOT_SETTINGS: combineStats([g.factory, g.less_health]),
-            TYPE: defExports.laserTest4Minion,
-            STAT_CALCULATOR: gunCalcNames.drone,
-            AUTOFIRE: true,
-            SYNCS_SKILLS: true,
-            MAX_CHILDREN: 1
-        }
-    }, {
-        POSITION: [12, 19.5, 1, 0, 0, 180, 0]
-    }]
-};
+;
 defExports.laserTest5Minion1Gun = {
     LABEL: "Laser Test 5 Minion 1 Gun",
     BODY: {
@@ -190868,6 +190804,271 @@ defExports.laserTest5 = {
     }]
 }
 
+// APPROVED LASER TANKS
+// TODO:
+// - Build branch structure
+// - Unify tanks under balancing system
+
+defExports.laserbeam = {
+    PARENT: [defExports.genericTank],
+    LABEL: 'Laserbeam',
+    DANGER: 10,
+    STAT_NAMES: statNames.laser,
+    GUNS: [{
+        POSITION: [30, 20, 1, 0, 0, 0, 0.25],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.half_reload, g.half_reload]),
+            TYPE: [defExports.laser, {
+                RANGE: 30,
+                DURATION: .35,
+                PIERCE: 2,
+                DAMAGE: .38,
+            }],
+            SKIN: 19
+        }
+    }]
+};
+
+
+defExports.plasmacutter = {
+    PARENT: [defExports.genericTank],
+    LABEL: 'Plasma Cutter',
+    DANGER: 10,
+    STAT_NAMES: statNames.laser,
+    GUNS: []
+};
+for (let i = 0, m = 6; i < m; i++) {
+    defExports.plasmacutter.GUNS.push({
+        POSITION: [30, 10, 1, 0, 0, 0, i / m],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.half_reload]),
+            TYPE: [defExports.laser, {
+                RANGE: 20 * (i / m),
+                DURATION: .5 / m,
+                PIERCE: 1,
+                DAMAGE: 6 / m,
+            }],
+            SKIN: 19
+        }
+    })
+}
+
+defExports.telemeter = {
+    PARENT: [defExports.genericTank],
+    LABEL: 'Telemeter',
+    BODY: {
+        FOV: 1.6,
+    },
+    DANGER: 10,
+    STAT_NAMES: statNames.laser,
+    GUNS: [{
+        POSITION: [45, 15, 1, 0, 0, 0, 0.5],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.half_reload, g.half_reload]),
+            TYPE: [defExports.laser, {
+                RANGE: 70,
+                DURATION: 0.65,
+                PIERCE: 3,
+                DAMAGE: 0.25,
+            }],
+            SKIN: 19
+        }
+    }],
+}
+
+
+defExports.atomizer = {
+    PARENT: [defExports.genericTank],
+    LABEL: 'Atomizer',
+    BODY: {
+        FOV: 1.4,
+    },
+    DANGER: 10,
+    STAT_NAMES: statNames.laser,
+    GUNS: [{
+        POSITION: [35, 30, 1, 0, 0, 0, 0.5],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.half_reload, g.half_reload, g.half_reload, g.half_reload, g.half_reload]),
+            TYPE: [defExports.laser, {
+                RANGE: 50,
+                DURATION: 2,
+                PIERCE: 10,
+                DAMAGE: 1.5,
+            }],
+            SKIN: 19
+        }
+    }],
+}
+
+defExports.cryptoMinerMinionGun = {
+    LABEL: "Crypto Miner Minion Gun",
+    BODY: {
+        FOV: 3
+    },
+    AI: {
+        IGNORE_SHAPES: false,
+        SKYNET: true
+    },
+    ACCEPTS_SCORE: false,
+    CONTROLLERS: ['nearestDifferentMaster'],
+    INDEPENDENT: true,
+    COLOR: 16,
+    GUNS: [{
+        POSITION: [25, 10, 1, 10, 0, 0, 3],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.more_reload, g.no_spread]),
+            TYPE: [defExports.laser, {
+                RANGE: 18,
+                DURATION: .5,
+                PIERCE: 1,
+                DAMAGE: .1,
+            }],
+            SKIN: 19
+        }
+    }, {
+        POSITION: [13, 10, 1, 5, 0, 0, 0]
+    }]
+}
+defExports.cryptoMinerMinion = {
+    PARENT: [defExports.minion],
+    LABEL: 'Crypto Miner Minion',
+    SHAPE: 4,
+    DANGER: 9,
+    BODY: {
+        SPEED: 4,
+        ACCELERATION: .532,
+        HEALTH: 5,
+        SHIELD: 20,
+        REGEN: 1.5,
+    },
+    INDEPENDENT: true,
+    GUNS: [],
+    ACCEPTS_SCORE: false,
+    TURRETS: [{
+        POSITION: [9, 8, 0, -35, 145, 0],
+        TYPE: defExports.cryptoMinerMinionGun
+    }, {
+        POSITION: [9, 8, 0, 35, 145, 0],
+        TYPE: defExports.cryptoMinerMinionGun
+    }]
+};
+defExports.cryptoMiner = { // Crypto Miner
+    PARENT: [defExports.genericTank],
+    LABEL: 'Crypto Miner',
+    SHAPE: 8,
+    DANGER: 7,
+    STAT_NAMES: statNames.minion,
+    BODY: {
+        SPEED: base.SPEED * .8,
+        FOV: 1.1
+    },
+    GUNS: [{
+        POSITION: [18, 8, 1, 0, 0, 0, 0],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.flank]),
+            TYPE: defExports.bullet
+        }
+    }, {
+        POSITION: [5, 16.5, 1, 10.5, 0, 180, 0]
+    }, {
+        POSITION: [2, 19.5, 1.01, 15.5, 0, 180, 0],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.factory, g.less_health]),
+            TYPE: defExports.cryptoMinerMinion,
+            STAT_CALCULATOR: gunCalcNames.drone,
+            AUTOFIRE: true,
+            SYNCS_SKILLS: true,
+            MAX_CHILDREN: 1
+        }
+    }, {
+        POSITION: [12, 19.5, 1, 0, 0, 180, 0]
+    }]
+}
+
+defExports.laserMechaGun1 = {
+    LABEL: "Mecha 2077 Gun 1",
+    BODY: {
+        FOV: 1
+    },
+    COLOR: 16,
+    GUNS: [{
+        POSITION: [23, 10, 1, 10, 0, 0, 1],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.mecha, g.less_reload, g.less_reload, g.less_reload, g.less_reload, g.less_reload]),
+            TYPE: [defExports.laser, {
+                RANGE: 20,
+                DURATION: 1,
+                PIERCE: 1,
+                DAMAGE: .5,
+            }],
+            SKIN: 19
+        }
+    }, {
+        POSITION: [13, 10, 1, 5, 0, 0, 0]
+    }]
+}
+defExports.laserMechaGun2 = {
+    LABEL: "Mecha 2077 Gun 2",
+    BODY: {
+        FOV: 1
+    },
+    COLOR: 16,
+    GUNS: [{
+        POSITION: [8, 4, 1, 18, 2, 0, 2 / 3],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.mecha, g.mini, g.laser, g.double_reload, g.more_damage, g.bigger]),
+            TYPE: defExports.line
+        }
+    }, {
+        POSITION: [10, 1, 1, 18, 2, 0, 0],
+        PROPERTIES: {
+            COLOR: 12
+        }
+    }, {
+        POSITION: [8, 4, 1, 18, -2, 0, 1 / 3],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.mecha, g.mini, g.laser, g.double_reload, g.more_damage, g.bigger]),
+            TYPE: defExports.line
+        }
+    }, {
+        POSITION: [10, 1, 1, 18, -2, 0, 0],
+        PROPERTIES: {
+            COLOR: 12
+        }
+    }, {
+        POSITION: [9.5, 4, 1, 18, 0, 0, 0],
+        PROPERTIES: {
+            SHOOT_SETTINGS: combineStats([g.basic, g.mecha, g.mini, g.laser, g.double_reload, g.more_damage, g.bigger]),
+            TYPE: defExports.line
+        }
+    }, {
+        POSITION: [11.5, 1, 1, 18, 0, 0, 0],
+        PROPERTIES: {
+            COLOR: 12
+        }
+    }, {
+        POSITION: [13, 10, 1, 5, 0, 0, 0]
+    }]
+}
+defExports.laserMecha = {
+    PARENT: [defExports.genericTank],
+    LABEL: 'Mecha 2077',
+    DANGER: 7,
+    STAT_NAMES: statNames.laser,
+    HAS_NO_RECOIL: true,
+    BODY: {
+        ACCELARATION: base.ACCEL * .75,
+        FOV: 1.1
+    },
+    TURRETS: [{
+        POSITION: [15, 0, 12, 0, 90, 0],
+        TYPE: defExports.laserMechaGun1
+    }, {
+        POSITION: [15, 0, -12, 0, 90, 0],
+        TYPE: defExports.laserMechaGun2
+    }]
+};
+
 
 /* TO DO:
 Make Snipe Guard level 30 and adjust its branches accordingly
@@ -190894,11 +191095,14 @@ branch("testbed_old_beta", "Old Beta Tanks", [
     defExports.afterimage
 ])
 branch("testbed_beta", "Beta Tanks", [
-    defExports.laserTest1,
-    defExports.laserTest2,
+    defExports.laserbeam,
+    defExports.laserMecha,
     defExports.laserTest3,
-    defExports.laserTest4,
+    defExports.cryptoMiner,
     defExports.laserTest5,
+    defExports.atomizer,
+    defExports.telemeter,
+    defExports.plasmacutter,
     defExports.pelletrework,
     defExports.precisestrike
 ], "testbed_parent");
@@ -191103,7 +191307,7 @@ branch("dreadnoughts", "Dreadnoughts", [
 
 // Featured Tanks
 branch("featured_tanks", "Featured Tanks", [
-    defExports.flakGun, defExports.descender, defExports.butane, defExports.orbitalstrike, defExports.obliterator, defExports.baller, defExports.shove31, defExports.shieldweaver, defExports.multishot, defExports.miniNukeShooter, defExports.clicker, defExports.packer, defExports.hexaTrap, defExports.cruiser, defExports.bent, defExports.basic
+    defExports.chinook, defExports.flakGun, defExports.descender, defExports.butane, defExports.orbitalstrike, defExports.obliterator, defExports.baller, defExports.shove31, defExports.shieldweaver, defExports.multishot, defExports.miniNukeShooter, defExports.clicker, defExports.packer, defExports.hexaTrap, defExports.cruiser, defExports.bent, defExports.basic
 ], "testbed_parent");
 
 branch("testbed_admin", "Admin Testbed", [
@@ -191979,7 +192183,7 @@ defExports.basicception.UPGRADES_TIER_3 = [defExports.twinAutoTwin, defExports.s
 defExports.accelerauto.UPGRADES_TIER_4 = [defExports.accelery, defExports.autoBooster]
 defExports.autoLittleArtillery.UPGRADES_TIER_4 = [defExports.autopilot];
 defExports.basicception.UPGRADES_TIER_4 = [defExports.recursion];
-defExports.helicoptor.UPGRADES_TIER_4 = [defExports.smashcoptor, defExports.whirlyRanger, defExports.auto22Heli, defExports.zoomDirigible, defExports.airway, defExports.potensic, defExports.stratofortress, defExports.mosquito, defExports.rocketCopter, defExports.rtx];
+defExports.helicoptor.UPGRADES_TIER_4 = [defExports.smashcoptor, defExports.whirlyRanger, defExports.auto22Heli, defExports.zoomDirigible, defExports.airway, defExports.potensic, defExports.stratofortress, defExports.mosquito, defExports.rocketCopter, defExports.rtx, defExports.chinook];
 //defExports.recursion.UPGRADES_TIER_4 = [defExports.recursion];
 defExports.autoMultishot.UPGRADES_TIER_4 = [defExports.multishotception];
 defExports.minishotception.UPGRADES_TIER_4 = [defExports.artilleryception, defExports.bentception, defExports.harasserception, defExports.miniSpreadception, defExports.littleCannonception, defExports.basicInsectception, defExports.hewnPelletception, defExports.dropception, defExports.miniAsteroid];
@@ -192362,12 +192566,12 @@ defExports.autoWoodpecker = makeAuto(defExports.woodpeck2);
 
 for (const key in defExports) {
     for (let i = 0; i < 5; i++) {
-        if (defExports[`UPGRADES_TIER_${i}`]) {
-            let array = defExports[`UPGRADES_TIER_${i}`];
+        if (defExports[`UPGRADES_TIER_${i} `]) {
+            let array = defExports[`UPGRADES_TIER_${i} `];
             for (let i = 0; i < array.length; i++) {
                 let tank = array[i];
                 if (tank == null) {
-                    throw new TypeError(`${key} was found to have an undefined upgrade on ${`TIER_${i}`} index ${i}`);
+                    throw new TypeError(`${key} was found to have an undefined upgrade on ${`TIER_${i}`} index ${i} `);
                 }
             }
         }
