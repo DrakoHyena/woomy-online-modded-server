@@ -10,7 +10,17 @@ const modeFuncs = { oneVsOne, warfront }
 // COMPAT //
 const worker = typeof parentPort === "undefined" ? self : parentPort
 const global = globalThis
-if (typeof global.fs === "undefined") global.fs = undefined;
+if (typeof global.fs === "undefined") {
+    global.fs = undefined;
+} else { // node
+    // Keeps the process alive instead of exiting
+    process.on('uncaughtException', (err) => {
+        console.error('Caught unhandled error:', err.message);
+    });
+    process.on('unhandledRejection', (reason, promise) => {
+        console.error('Caught unhandled rejection:', reason);
+    });
+}
 
 global.utility = {
     log: (e) => { console.log("[LOG]", e) }
@@ -6798,7 +6808,9 @@ async function startServer(configSuffix, defExports, displyNameOverride, display
                         this.isArenaCloser = set.IS_ARENA_CLOSER;
                         if (this.isArenaCloser) this.immuneToAbilities = true;
                     }
+                    if (this.onVarsCleared) this.onVarsCleared(this);
                     this.variables = set.VARIABLES ? JSON.parse(JSON.stringify(set.VARIABLES)) : {};
+                    this.onVarsCleared = set.ON_VARIABLES_CLEARED || false;
                     this.animations = [];
                     if (this.isShiny) {
                         this.color = -1
@@ -6882,9 +6894,38 @@ async function startServer(configSuffix, defExports, displyNameOverride, display
                 this.isTurret = true;
             }
             get size() {
-                //if (this.bond == null) return (this.coreSize || this.SIZE) * (1 + this.skill.level / 60);
-                if (this.bond == null) return this.SIZE * (1 + (this.skill.level > c.SKILL_CAP ? c.SKILL_CAP : this.skill.level) / 60);
-                return this.bond.size * this.bound.size;
+                // 1. Calculate this entity's own standalone base size
+                const levelFactor = 1 + (this.skill.level > c.SKILL_CAP ? c.SKILL_CAP : this.skill.level) / 60;
+                const ownBaseSize = (this.SIZE) * levelFactor;
+
+                // 2. Fast path: If not a sub-turret, return own base size immediately (O(1), zero recursion)
+                if (!this.bond || !this.bound) {
+                    return ownBaseSize;
+                }
+
+                // 3. Iteratively climb the bond tree without calling `.size` on other entities
+                let multiplier = this.bound.size || 1;
+                let curr = this.bond;
+                let depth = 0;
+
+                // Climb up as long as the parent is also a sub-turret (hard limit of 1048 levels to prevent infinite loops)
+                while (curr && curr.isTurret && curr.bound && depth < 1048) {
+                    if (curr === this) break; // Cycle detected: abort compounding
+                    multiplier *= (curr.bound.size || 1);
+                    curr = curr.bond;
+                    depth++;
+                }
+
+                // If root is invalid or cyclic, fall back safely to own size
+                if (!curr || curr === this) {
+                    return ownBaseSize;
+                }
+
+                // 4. Calculate root tank's base size directly
+                const rootLevelFactor = 1 + (curr.skill.level > c.SKILL_CAP ? c.SKILL_CAP : curr.skill.level) / 60;
+                const rootBaseSize = (curr.SIZE) * rootLevelFactor;
+
+                return rootBaseSize * multiplier;
             }
             get mass() {
                 return this.density * (this.size * this.size + 1);
@@ -7189,10 +7230,17 @@ async function startServer(configSuffix, defExports, displyNameOverride, display
                         if (this.topSpeed) this.damp = a / this.topSpeed;
                         if (gactive) {
                             let len = Math.sqrt(g.x * g.x + g.y * g.y);
-                            engine = {
-                                x: a * g.x / len,
-                                y: a * g.y / len
-                            };
+                            if (len !== 0 && len !== NaN) {
+                                engine = {
+                                    x: a * g.x / len,
+                                    y: a * g.y / len
+                                };
+                            } else {
+                                engine = {
+                                    x: 0.001,
+                                    y: 0.001,
+                                }
+                            }
                         } else this.damp = .005;
                         break;
                     case "grow":

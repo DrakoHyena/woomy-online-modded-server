@@ -237,7 +237,7 @@ worker.start = async function(gamemodeCode, displayNameOverride, displayDescOver
                     // WRM, RoomUpdatePlayers
                     roomWs.send(JSON.stringify({
                         players: data.players,
-                        name: data.name || gamemodeCode,
+                        name: data.name + " " + ["🎉 ", "👏", "🚀", "🔥", "💯", "👀", "🐴", "🆓", "⚠️", "💥", "🚨", "✨", "🌟", "⏳", "⏱️", "😶‍🌫️", "🕶", "🧹"][Math.floor(Math.random() * 18)] || gamemodeCode,
                         desc: data.desc
                     }))
                     break;
